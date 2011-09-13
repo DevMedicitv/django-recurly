@@ -1,1 +1,12 @@
 *.pyc
+._*
+*.db
+*.egg-info
+.coverage
+.pip
+.sqlite_history
+.vim
+nosetests.xml
+coverage.xml
+.TemporaryItems
+.cache
