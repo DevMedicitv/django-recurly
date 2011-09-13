@@ -1,31 +1,48 @@
 import unittest
-import glob
-import os.path
+import datetime
 
 from django.test import TestCase
 
 from django_recurly import views
 from django_recurly.tests.base import BaseTest, RequestFactory
+from django_recurly.models import *
 
 rf = RequestFactory()
 
 class PushNotificationViewTest(BaseTest):
     
     def test_all(self):
-        xml_dir = os.path.abspath(os.path.dirname(__file__)) + "/data/push_notifications/*/*"
-        xml_files = glob.glob(xml_dir)
         
-        for xml_file in xml_files:
-            f = open(xml_file, "r")
-            xml = f.read()
-            f.close()
-            
+        for name, xml in self.push_notifications.items():
+            signal, t = name.split("-")
             request = rf.post("/junk", xml, content_type="text/xml")
-            # Quick & dirty parsing of the expected singal name from the file name
-            expected_signal = "_".join(xml_file.split("/")[-1].split("_")[:-1])
             
             self.resetSignals()
-            views.push_notifications(request)
-            self.assertSignal(expected_signal)
+            # views.push_notifications(request)
+            # self.assertSignal(signal)
+        
+    
+    def test_new_subscription(self):
+        request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"], content_type="text/xml")
+        views.push_notifications(request)
+        
+        account = Account.objects.get(pk=1)
+        
+        self.assertEqual(account.user.username, "verena")
+        self.assertEqual(account.first_name, "Verena")
+        self.assertEqual(account.company_name, "Company, Inc.")
+        self.assertEqual(account.email, "verena@test.com")
+        self.assertEqual(account.account_code, "verena@test.com")
+        
+        subscription = account.get_current_subscription()
+        self.assertEqual(subscription.plan_code, "bronze")
+        self.assertEqual(subscription.plan_version, 2)
+        self.assertEqual(subscription.state, "active")
+        self.assertEqual(subscription.quantity, 2)
+        self.assertEqual(subscription.total_amount_in_cents, 2000)
+        self.assertEqual(subscription.activated_at, datetime.datetime(2009, 11, 22, 21, 10, 38)) # Phew, its in UTC now :)
+        
+        
+        
         
     

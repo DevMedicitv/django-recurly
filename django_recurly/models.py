@@ -2,13 +2,18 @@ from django.db import models
 from django.contrib.auth.models import User
 from datetime import datetime
 
+from django_recurly.utilities import random_string, modelify
+
 SUBSCRIPTION_STATES = (
-    ("active", "Active")         # Active and everything is fine
-    ("cancelled", "Cancelled")   # Still active, but will not be renewed
-    ("expired", "Expired")       # Did not renews, or was forcibly expired early
+    ("active", "Active"),         # Active and everything is fine
+    ("cancelled", "Cancelled"),   # Still active, but will not be renewed
+    ("expired", "Expired"),       # Did not renews, or was forcibly expired early
 )
 
+__all__ = ("Account", "Subscription", "User")
+
 class Account(models.Model):
+    account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User)
     created_at = models.DateTimeField(default=datetime.now())
     email = models.CharField(max_length=100)
@@ -46,6 +51,41 @@ class Account(models.Model):
     @classmethod
     def get_current(class_, user):
         return class_.objects.filter(user=user, cancelled=False).latest()
+    
+    @classmethod
+    def update_from_xml(class_, data):
+        """Update/create an account and it's associated subscription using data from Recurly"""
+        
+        # First get/create the account
+        account_data = modelify(data.get("account"), Account)
+        
+        account, created = class_.objects.get_or_create(
+            account_code=account_data["account_code"],
+            defaults=account_data
+        )
+        
+        if not created:
+            for k, v in account_data.items():
+                setattr(account, k, v)
+            account.save()
+        
+        # Now get/create the subscription
+        if not data.get("subscription"):
+            return account, None
+        
+        subscription_data = modelify(data.get("subscription"), Subscription)
+        subscription = account.get_current_subscription()
+    
+        if not subscription:
+            # Not found, create it
+            subscription = Subscription.objects.create(account=account, **subscription_data)
+        else:
+            # Found, update it
+            subscription.update(**subscription_data)
+            subscription.save()
+        
+        return account, subscription
+    
 
 class Subscription(models.Model):
     account = models.ForeignKey(Account)
@@ -77,7 +117,7 @@ class Subscription(models.Model):
         they are 'expired')
         """
         
-        return self.super_subscription or state in ("active", "cancelled")
+        return self.super_subscription or self.state in ("active", "cancelled")
     
     def is_trial(self):
         if self.super_subscription:

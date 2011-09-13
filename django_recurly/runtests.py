@@ -4,7 +4,7 @@
 # http://ericholscher.com/blog/2009/jun/29/enable-setuppy-test-your-django-apps/
 
 import os, sys
-os.environ['DJANGO_SETTINGS_MODULE'] = 'django_recurly.settings'
+os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
 
 test_dir = os.path.dirname(__file__)
 sys.path.insert(0, test_dir)

@@ -12,14 +12,14 @@ from . import signals
 @require_POST
 def push_notifications(request):
     client = get_client()
-
+    
     name = client.parse_notification(request.raw_post_data)
-
+    
     try:
         signal = getattr(signals, name)
     except AttributeError:
         return HttpResponseBadRequest("Invalid notification name.")
-
+    
     signal.send(sender=client, data=client.response)
-
+    
     return HttpResponse()

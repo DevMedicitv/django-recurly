@@ -1,4 +1,6 @@
 import weakref
+import glob
+import os.path
 
 from django.test import TestCase
 from django.test.client import Client
@@ -6,12 +8,16 @@ from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 
 from django_recurly import signals
+from django_recurly.models import *
 
 class BaseTest(TestCase):
     def setUp(self):
         super(BaseTest, self).setUp()
         self._signals = set([])
         self._setUpSignals()
+        self.setUpData()
+        
+        self.user = User.objects.create(username="verena", email="moo@cow.com")
     
     def tearDown(self):
         super(BaseTest, self).tearDown()
@@ -43,6 +49,21 @@ class BaseTest(TestCase):
     
     def assertNoSignal(self, signal):
         self.assertFalse(signal in self._signals, "Signal '%s' was sent" % signal)
+    
+    def setUpData(self):
+        xml_dir = os.path.abspath(os.path.dirname(__file__)) + "/data/push_notifications/*/*"
+        xml_files = glob.glob(xml_dir)
+        
+        self.push_notifications = {}
+        for xml_file in xml_files:
+            f = open(xml_file, "r")
+            xml = f.read()
+            f.close()
+            
+            name = xml_file.split("/")[-1]
+            
+            self.push_notifications[name] = xml
+        
     
 
 class RequestFactory(Client):

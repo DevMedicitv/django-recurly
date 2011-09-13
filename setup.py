@@ -6,4 +6,8 @@ setup(
     name='django-recurly',
     license='BSD',
     packages=find_packages(),
+    
+    install_requires=[
+        "iso8601",
+    ]
 )
