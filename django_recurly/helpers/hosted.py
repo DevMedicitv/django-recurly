@@ -24,7 +24,7 @@ def get_subscribe_url(plan_code, user, quantity=1, account_code=None):
     params = {
         "subdomain": get_client().subdomain,
         "plan_code": urlquote_plus(plan_code),
-        "account_code": urlquote_plus(account_code) or random_string(length=32),
+        "account_code": urlquote_plus(account_code) if account_code else random_string(length=32),
         "username": urlquote_plus(user.username),
         
         "quantity": quantity,
