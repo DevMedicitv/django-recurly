@@ -9,5 +9,6 @@ setup(
     
     install_requires=[
         "iso8601",
+        "django-timezones",
     ]
 )

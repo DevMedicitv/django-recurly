@@ -10,8 +10,17 @@ RECURLY_SUBDOMAIN = "dummy_subdomain"
 # Set both of these to something big and random
 # (you will need to specify them in Recurly when setting up 
 # push notification URL)
+# Note: The username must NOT contain a colon (:).
 RECURLY_NOTIFICATION_USERNAME = "1234567890abcdefghijklmnop"
 RECURLY_NOTIFICATION_PASSWORD = "abcdefghijklmnop0987654321"
+
+# For the love of all things holy, please keep this set to a sensible 
+# (i.e. unchanging / non daylight saving) timezone. This determines the 
+# timezone  in which django_recurly stores dates in the DB, so if you 
+# change this down the road then all your subscription dates will skew.
+# The sane thing to do here is to keep this as UTC and handle the 
+# timezone conversion in your display logic.
+TIME_ZONE = "UTC"
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 

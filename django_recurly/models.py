@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from datetime import datetime
 import pytz
 
+from timezones.fields import LocalizedDateTimeField
+
 from django_recurly.utilities import random_string, modelify
 
 SUBSCRIPTION_STATES = (
@@ -16,7 +18,7 @@ __all__ = ("Account", "Subscription", "User")
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User, related_name="recurly_account")
-    created_at = models.DateTimeField(default=datetime.now())
+    created_at = LocalizedDateTimeField(default=datetime.now())
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -96,13 +98,13 @@ class Subscription(models.Model):
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
     total_amount_in_cents = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=8) # NOT ALWAYS IN CENTS!
-    activated_at = models.DateTimeField(blank=True, null=True)
-    canceled_at = models.DateTimeField(blank=True, null=True)
-    expires_at = models.DateTimeField(blank=True, null=True)
-    current_period_started_at = models.DateTimeField(blank=True, null=True)
-    current_period_ends_at = models.DateTimeField(blank=True, null=True)
-    trial_started_at = models.DateTimeField(blank=True, null=True)
-    trial_ends_at = models.DateTimeField(blank=True, null=True)
+    activated_at = LocalizedDateTimeField(blank=True, null=True)
+    canceled_at = LocalizedDateTimeField(blank=True, null=True)
+    expires_at = LocalizedDateTimeField(blank=True, null=True)
+    current_period_started_at = LocalizedDateTimeField(blank=True, null=True)
+    current_period_ends_at = LocalizedDateTimeField(blank=True, null=True)
+    trial_started_at = LocalizedDateTimeField(blank=True, null=True)
+    trial_ends_at = LocalizedDateTimeField(blank=True, null=True)
     
     super_subscription = models.BooleanField(default=False)
     
