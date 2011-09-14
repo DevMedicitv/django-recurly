@@ -25,7 +25,7 @@ def push_notifications(request):
     if auth[0].lower() != "basic":
         return HttpResponseForbidden("Only basic auth is supported")
     
-    uname, passwd = base64.b64decode(auth[1]).split(':')
+    uname, passwd = base64.b64decode(auth[1]).split(':', 1)
     if not constant_time_compare(uname, settings.RECURLY_NOTIFICATION_USERNAME) or not constant_time_compare(passwd, settings.RECURLY_NOTIFICATION_PASSWORD):
         return HttpResponseForbidden("Invalid username/password")
     
