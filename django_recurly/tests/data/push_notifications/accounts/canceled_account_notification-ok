@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<canceled_account_notification>
+  <account>
+    <account_code>verena@test.com</account_code>
+    <username>verena</username>
+    <email>verena@test.com</email>
+    <first_name>Verena</first_name>
+    <last_name>Test</last_name>
+    <company_name></company_name>
+  </account>
+</canceled_account_notification>

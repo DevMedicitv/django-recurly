@@ -63,7 +63,14 @@ class BaseTest(TestCase):
             name = xml_file.split("/")[-1]
             
             self.push_notifications[name] = xml
+    
+    def parse_xml(self, xml):
+        from django_recurly.client import get_client
         
+        client = get_client()
+        client.parse_notification(xml)
+        
+        return client.response
     
 
 class RequestFactory(Client):

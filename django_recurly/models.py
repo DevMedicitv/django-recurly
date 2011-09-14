@@ -1,12 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import User
 from datetime import datetime
+import pytz
 
 from django_recurly.utilities import random_string, modelify
 
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
-    ("cancelled", "Cancelled"),   # Still active, but will not be renewed
+    ("canceled", "Canceled"),   # Still active, but will not be renewed
     ("expired", "Expired"),       # Did not renews, or was forcibly expired early
 )
 
@@ -20,7 +21,7 @@ class Account(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     company_name = models.CharField(max_length=100, blank=True, null=True)
-    cancelled = models.BooleanField(default=False)
+    canceled = models.BooleanField(default=False)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
     
     class Meta:
@@ -50,10 +51,10 @@ class Account(models.Model):
     
     @classmethod
     def get_current(class_, user):
-        return class_.objects.filter(user=user, cancelled=False).latest()
+        return class_.objects.filter(user=user, canceled=False).latest()
     
     @classmethod
-    def update_from_xml(class_, data):
+    def handle_notification(class_, data):
         """Update/create an account and it's associated subscription using data from Recurly"""
         
         # First get/create the account
@@ -81,7 +82,8 @@ class Account(models.Model):
             subscription = Subscription.objects.create(account=account, **subscription_data)
         else:
             # Found, update it
-            subscription.update(**subscription_data)
+            for k, v in subscription_data.items():
+                setattr(subscription, k, v)
             subscription.save()
         
         return account, subscription
@@ -95,7 +97,7 @@ class Subscription(models.Model):
     quantity = models.IntegerField(default=1)
     total_amount_in_cents = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=8) # NOT ALWAYS IN CENTS!
     activated_at = models.DateTimeField(blank=True, null=True)
-    cancelled_at = models.DateTimeField(blank=True, null=True)
+    canceled_at = models.DateTimeField(blank=True, null=True)
     expires_at = models.DateTimeField(blank=True, null=True)
     current_period_started_at = models.DateTimeField(blank=True, null=True)
     current_period_ends_at = models.DateTimeField(blank=True, null=True)
@@ -111,23 +113,23 @@ class Subscription(models.Model):
     def is_current(self):
         """Is this subscription current (i.e. not expired and good to be used)
         
-        Note that 'cancelled' accounts are actually still 'current', as 
-        'cancelled' just indicates they they will not renew after the 
+        Note that 'canceled' accounts are actually still 'current', as 
+        'canceled' just indicates they they will not renew after the 
         current billing period (at which point Recurly will tell us that 
         they are 'expired')
         """
         
-        return self.super_subscription or self.state in ("active", "cancelled")
+        return self.super_subscription or self.state in ("active", "canceled")
     
     def is_trial(self):
         if self.super_subscription:
             return False
         
-        if not trial_started_at or not trial_ends_at:
+        if not self.trial_started_at or not self.trial_ends_at:
             return False # No trial dates, so not a trial
         
-        now = datetime.now()
-        if trial_started_at <= now and trial_ends_at > now:
+        now = datetime.now(tz=pytz.utc)
+        if self.trial_started_at <= now and self.trial_ends_at > now:
             return True
         else:
             return False

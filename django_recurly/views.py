@@ -2,10 +2,10 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-from .client import get_client
-from .decorators import recurly_basic_authentication
+from django_recurly.client import get_client
+from django_recurly.decorators import recurly_basic_authentication
 
-from . import signals
+from django_recurly import signals
 
 @csrf_exempt
 @recurly_basic_authentication
