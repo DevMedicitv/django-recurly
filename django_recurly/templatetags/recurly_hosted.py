@@ -8,7 +8,7 @@ from django_recurly.helpers.hosted import get_subscribe_url
 
 register = template.Library()
 
-@register.simple_tag(takes_context=True)
-def subscribe_url(context, plan_code, quantity=1):
-    return get_subscribe_url(plan_code, context["request"]["user"], quantity)
+@register.simple_tag
+def subscribe_url(user, plan_code, quantity=1):
+    return get_subscribe_url(plan_code, user, quantity)
 
