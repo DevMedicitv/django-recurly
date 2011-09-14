@@ -1,6 +1,7 @@
 import weakref
 import glob
 import os.path
+import base64
 
 from django.test import TestCase
 from django.test.client import Client
@@ -76,6 +77,9 @@ class BaseTest(TestCase):
 class RequestFactory(Client):
     # Used to generate request objects.
     def request(self, **request):
+        credentials = base64.encodestring('%s:%s' % (settings.RECURLY_NOTIFICATION_USERNAME, settings.RECURLY_NOTIFICATION_PASSWORD)).strip()
+        auth_string = 'Basic %s' % credentials
+        
         environ = {
             'HTTP_COOKIE': self.cookies,
             'PATH_INFO': '/',
@@ -85,6 +89,7 @@ class RequestFactory(Client):
             'SERVER_NAME': 'testserver',
             'SERVER_PORT': 80,
             'SERVER_PROTOCOL': 'HTTP/1.1',
+            'HTTP_AUTHORIZATION': auth_string,
         }
         environ.update(self.defaults)
         environ.update(request)

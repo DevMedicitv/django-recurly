@@ -7,6 +7,12 @@ RECURLY_USERNAME = "dummy_username"
 RECURLY_PASSWORD = "dummy_password"
 RECURLY_SUBDOMAIN = "dummy_subdomain"
 
+# Set both of these to something big and random
+# (you will need to specify them in Recurly when setting up 
+# push notification URL)
+RECURLY_NOTIFICATION_USERNAME = "1234567890abcdefghijklmnop"
+RECURLY_NOTIFICATION_PASSWORD = "abcdefghijklmnop0987654321"
+
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 DATABASES = {

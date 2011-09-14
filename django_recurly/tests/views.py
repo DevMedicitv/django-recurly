@@ -18,13 +18,15 @@ class PushNotificationViewTest(BaseTest):
             request = rf.post("/junk", xml, content_type="text/xml")
             
             self.resetSignals()
-            # views.push_notifications(request)
-            # self.assertSignal(signal)
+            response = views.push_notifications(request)
+            self.assertEqual(response.status_code, 200)
+            self.assertSignal(signal)
         
     
     def test_new_subscription(self):
         request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"], content_type="text/xml")
-        views.push_notifications(request)
+        response = views.push_notifications(request)
+        self.assertEqual(response.status_code, 200)
         
         account = Account.objects.get(pk=1)
         
