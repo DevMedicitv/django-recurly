@@ -18,7 +18,7 @@ __all__ = ("Account", "Subscription", "User")
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User, related_name="recurly_account")
-    created_at = models.DateTimeField(default=datetime.now(tz=pytz.utc))
+    created_at = LocalizedDateTimeField(default=datetime.now(tz=pytz.utc))
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
