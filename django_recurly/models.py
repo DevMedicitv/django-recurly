@@ -18,7 +18,7 @@ __all__ = ("Account", "Subscription", "User")
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User, related_name="recurly_account")
-    created_at = LocalizedDateTimeField(default=datetime.now())
+    created_at = models.DateTimeField(default=datetime.now(tz=pytz.utc))
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -58,7 +58,6 @@ class Account(models.Model):
     @classmethod
     def handle_notification(class_, data):
         """Update/create an account and it's associated subscription using data from Recurly"""
-        
         # First get/create the account
         account_data = modelify(data.get("account"), Account)
         

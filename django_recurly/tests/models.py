@@ -78,6 +78,32 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 200)
     
+    def test_handle_notification_updating_expired_real(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        Account.handle_notification(data)
+        
+        data = self.parse_xml(self.push_notifications["expired_subscription_notification-real"])
+        account, subscription = Account.handle_notification(data)
+        
+        # Lets be through here
+        self.assertEqual(account.user.username, "verena")
+        self.assertEqual(account.first_name, "Adam")
+        self.assertEqual(account.last_name, "Charnock")
+        self.assertEqual(account.company_name, None)
+        self.assertEqual(account.email, "adam@continuous.io")
+        self.assertEqual(account.account_code, "vKWanguTh5KcZniN0yZeFbjD8xmFfVGT")
+        
+        subscription = account.get_current_subscription()
+        self.assertEqual(subscription, None)
+        
+        subscription = account.get_subscriptions().latest()
+        self.assertEqual(subscription.plan_code, "micro")
+        self.assertEqual(subscription.plan_version, 1)
+        self.assertEqual(subscription.state, "expired")
+        self.assertEqual(subscription.quantity, 1)
+        self.assertEqual(subscription.total_amount_in_cents, 700)
+        self.assertEqual(subscription.activated_at, datetime.datetime(2011, 9, 14, 19, 14, 14)) # Phew, its in UTC now :)
+    
     def test_handle_notification_new_after_expired(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         Account.handle_notification(data)
