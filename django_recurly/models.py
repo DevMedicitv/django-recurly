@@ -56,10 +56,7 @@ class Account(models.Model):
         return self.subscription_set.all()
     
     def get_current_subscription(self):
-        try:
-            return Subscription.current.filter(account=self).latest()
-        except Subscription.DoesNotExist:
-            return None
+        return Subscription.current.filter(account=self).latest()
     
     def fetch_hosted_login_token(self):
         raise NotImplemented("Well, it's not. Sorry.")
