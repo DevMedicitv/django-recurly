@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 from datetime import datetime
 import pytz
@@ -15,6 +16,16 @@ SUBSCRIPTION_STATES = (
 
 __all__ = ("Account", "Subscription", "User")
 
+class CurrentAccountManager(models.Manager):
+    def get_query_set(self):
+        return super(CurrentAccountManager, self).get_query_set().filter(canceled=False)
+    
+
+class CurrentSubscriptionManager(models.Manager):
+    def get_query_set(self):
+        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(super_subscription=True) | Q(state__in=("active", "canceled")))
+    
+
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User, related_name="recurly_account")
@@ -25,6 +36,9 @@ class Account(models.Model):
     company_name = models.CharField(max_length=100, blank=True, null=True)
     canceled = models.BooleanField(default=False)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
+    
+    objects = models.Manager()
+    current = CurrentAccountManager()
     
     class Meta:
         ordering = ["-id"]
@@ -42,18 +56,17 @@ class Account(models.Model):
         return self.subscription_set.all()
     
     def get_current_subscription(self):
-        for subscription in self.get_subscriptions():
-            if subscription.is_current():
-                return subscription
-        
-        return None
+        try:
+            return Subscription.current.filter(account=self).latest()
+        except Subscription.DoesNotExist:
+            return None
     
     def fetch_hosted_login_token(self):
         raise NotImplemented("Well, it's not. Sorry.")
     
     @classmethod
     def get_current(class_, user):
-        return class_.objects.filter(user=user, canceled=False).latest()
+        return class_.current.filter(user=user).latest()
     
     @classmethod
     def handle_notification(class_, data):
@@ -107,6 +120,9 @@ class Subscription(models.Model):
     
     super_subscription = models.BooleanField(default=False)
     
+    objects = models.Manager()
+    current = CurrentSubscriptionManager()
+    
     class Meta:
         ordering = ["-id"]
         get_latest_by = "id"
@@ -120,7 +136,7 @@ class Subscription(models.Model):
         they are 'expired')
         """
         
-        return self.super_subscription or self.state in ("active", "canceled")
+        return bool(Subscription.current.filter(pk=self.pk).count())
     
     def is_trial(self):
         if self.super_subscription:

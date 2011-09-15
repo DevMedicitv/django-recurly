@@ -119,6 +119,12 @@ class AccountModelTest(BaseTest):
         self.assertEqual(Subscription.objects.count(), 2)
         self.assertEqual(Subscription.objects.latest().state, "active")
     
+    def test_get_current(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(data)
+        
+        account = Account.get_current(self.user)
+        self.assertEqual(account.user.username, "verena")
 
 class SubscriptionModelTest(BaseTest):
     
