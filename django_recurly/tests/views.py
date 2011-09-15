@@ -28,8 +28,9 @@ class PushNotificationViewTest(BaseTest):
         response = views.push_notifications(request)
         self.assertEqual(response.status_code, 200)
         
-        account = Account.objects.get(pk=1)
+        account = Account.objects.latest()
         
+        self.assertEqual(Account.objects.count(), 1)
         self.assertEqual(account.user.username, "verena")
         self.assertEqual(account.first_name, "Verena")
         self.assertEqual(account.company_name, "Company, Inc.")
@@ -37,6 +38,7 @@ class PushNotificationViewTest(BaseTest):
         self.assertEqual(account.account_code, "verena@test.com")
         
         subscription = account.get_current_subscription()
+        self.assertEqual(Subscription.objects.count(), 1)
         self.assertEqual(subscription.plan_code, "bronze")
         self.assertEqual(subscription.plan_version, 2)
         self.assertEqual(subscription.state, "active")
