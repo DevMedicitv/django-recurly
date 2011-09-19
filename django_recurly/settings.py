@@ -7,12 +7,9 @@ RECURLY_USERNAME = "dummy_username"
 RECURLY_PASSWORD = "dummy_password"
 RECURLY_SUBDOMAIN = "dummy_subdomain"
 
-# Set both of these to something big and random
-# (you will need to specify them in Recurly when setting up 
-# push notification URL)
-# Note: The username must NOT contain a colon (:).
-RECURLY_NOTIFICATION_USERNAME = "1234567890abcdefghijklmnop"
-RECURLY_NOTIFICATION_PASSWORD = "abcdefghijklmnop0987654321"
+# The username & password used to authorise Recurly's 
+# postback notifications. In the format "username:password"
+RECURLY_HTTP_AUTHENTICATION = "1234567890abcdefghijklmnop:abcdefghijklmnop0987654321"
 
 # For the love of all things holy, please keep this set to a sensible 
 # (i.e. unchanging / non daylight saving) timezone. This determines the 
