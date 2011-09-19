@@ -30,10 +30,15 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.quantity, 2)
         self.assertEqual(subscription.total_amount_in_cents, 2000)
         self.assertEqual(subscription.activated_at, datetime.datetime(2009, 11, 22, 21, 10, 38)) # Phew, its in UTC now :)
+        
+        self.assertSignal("account_opened")
+        self.assertNoSignal("account_closed")
     
     def test_handle_notification_updating_cancelled(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         Account.handle_notification(data)
+        
+        self.resetSignals()
         
         data = self.parse_xml(self.push_notifications["canceled_subscription_notification-ok"])
         account, subscription = Account.handle_notification(data)
@@ -52,10 +57,16 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.state, "canceled")
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 200)
+        
+        # Account was 'cancelled', but is still technically open until is expires
+        self.assertNoSignal("account_opened")
+        self.assertNoSignal("account_closed")
     
     def test_handle_notification_updating_expired(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         Account.handle_notification(data)
+        
+        self.resetSignals()
         
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-ok"])
         account, subscription = Account.handle_notification(data)
@@ -77,11 +88,12 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.state, "expired")
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 200)
+        
+        self.assertNoSignal("account_opened")
+        self.assertSignal("account_closed")
     
     def test_handle_notification_updating_expired_real(self):
-        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        Account.handle_notification(data)
-        
+        # Straight in with no prior account
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-real"])
         account, subscription = Account.handle_notification(data)
         
@@ -103,6 +115,10 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 700)
         self.assertEqual(subscription.activated_at, datetime.datetime(2011, 9, 14, 19, 14, 14)) # Phew, its in UTC now :)
+        
+        # The subscription was created as 'expired' right away, so no signals
+        self.assertNoSignal("account_opened")
+        self.assertNoSignal("account_closed")
     
     def test_handle_notification_new_after_expired(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
@@ -111,6 +127,8 @@ class AccountModelTest(BaseTest):
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-ok"])
         Account.handle_notification(data)
         
+        self.resetSignals()
+        
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         Account.handle_notification(data)
         
@@ -118,6 +136,9 @@ class AccountModelTest(BaseTest):
         # We should now have the old expired subscription, plus the fresh new one
         self.assertEqual(Subscription.objects.count(), 2)
         self.assertEqual(Subscription.objects.latest().state, "active")
+        
+        self.assertSignal("account_opened")
+        self.assertNoSignal("account_closed")
     
     def test_get_current(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])

@@ -7,6 +7,7 @@ import pytz
 from timezones.fields import LocalizedDateTimeField
 
 from django_recurly.utilities import random_string, modelify
+from django_recurly import signals
 
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
@@ -56,7 +57,10 @@ class Account(models.Model):
         return self.subscription_set.all()
     
     def get_current_subscription(self):
-        return Subscription.current.filter(account=self).latest()
+        try:
+            return Subscription.current.filter(account=self).latest()
+        except Subscription.DoesNotExist:
+            return None
     
     def fetch_hosted_login_token(self):
         raise NotImplemented("Well, it's not. Sorry.")
@@ -87,15 +91,30 @@ class Account(models.Model):
         
         subscription_data = modelify(data.get("subscription"), Subscription)
         subscription = account.get_current_subscription()
-    
+        
+        
         if not subscription:
             # Not found, create it
             subscription = Subscription.objects.create(account=account, **subscription_data)
+            
+            was_current = False
+            now_current = subscription.is_current()
+            
         else:
+            was_current = subscription.is_current()
+            
             # Found, update it
             for k, v in subscription_data.items():
                 setattr(subscription, k, v)
             subscription.save()
+            
+            now_current = subscription.is_current()
+        
+        # Send account closed/opened signals
+        if was_current and not now_current:
+            signals.account_closed.send(sender=account, account=account, subscription=subscription)
+        elif not was_current and now_current:
+            signals.account_opened.send(sender=account, account=account, subscription=subscription)
         
         return account, subscription
     
