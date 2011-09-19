@@ -13,7 +13,7 @@ from django_recurly.utilities import random_string
 
 SUBSCRIBE_URL = "https://%(subdomain)s.recurly.com/subscribe/%(plan_code)s/%(account_code)s/%(username)s?quantity=%(quantity)s&first_name=%(first_name)s&last_name=%(last_name)s&email=%(email)s"
 
-def get_subscribe_url(plan_code, user, quantity=1, account_code=None):
+def get_subscribe_url(user, plan_code, quantity=1, account_code=None):
     """Generate the URL for the hosted payment page
     
     Redirect the user to this URL to send them off to Recurly.

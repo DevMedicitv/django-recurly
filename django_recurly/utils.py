@@ -1,4 +1,7 @@
 import urllib
+import urlparse
+
+from django.shortcuts import redirect
 
 from django.conf import settings
 
@@ -18,3 +21,14 @@ def hosted_payment_page_url(plan_code, account_code, data=None):
         account_code,
         urllib.urlencode(data),
     )
+
+def safe_redirect(url, fallback="/"):
+    netloc = urlparse.urlparse(redirect_to)[1]
+    
+    if not url:
+        safe_url = fallback
+    # Don't redirect the user to a different host
+    elif netloc and netloc != request.get_host():
+        redirect_to = fallback
+    
+    return redirect(safe_url)

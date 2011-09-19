@@ -8,6 +8,7 @@ from timezones.fields import LocalizedDateTimeField
 
 from django_recurly.utilities import random_string, modelify
 from django_recurly import signals
+from django_recurly.client import get_client
 
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
@@ -167,3 +168,22 @@ class Subscription(models.Model):
         else:
             return False
     
+    def change_plan(self, plan_code):
+        """Change this subscription to the specified plan_code.
+        
+        This will call the Recurly API.
+        """
+        client = get_client()
+        
+        update_data = {
+            "timeframe": "now",
+            "plan_code": plan_code
+        }
+        
+        client.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
+        self.plan_code = plan_code
+        self.save()
+        
+    
+
+
