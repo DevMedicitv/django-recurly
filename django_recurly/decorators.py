@@ -3,6 +3,7 @@ import functools
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseBadRequest, \
     HttpResponseForbidden
+from django.utils.crypto import constant_time_compare
 
 def recurly_basic_authentication(fn):
     @functools.wraps(fn)
@@ -26,7 +27,7 @@ def recurly_basic_authentication(fn):
             if method.lower() != 'basic':
                 raise ValueError()
 
-            if auth.strip().decode('base64') != authentication:
+            if not constant_time_compare(auth.strip().decode('base64'), authentication):
                 return HttpResponseForbidden()
         except Exception:
             return HttpResponseBadRequest()
