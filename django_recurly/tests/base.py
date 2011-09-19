@@ -77,7 +77,7 @@ class BaseTest(TestCase):
 class RequestFactory(Client):
     # Used to generate request objects.
     def request(self, **request):
-        credentials = base64.encodestring('%s:%s' % (settings.RECURLY_NOTIFICATION_USERNAME, settings.RECURLY_NOTIFICATION_PASSWORD)).strip()
+        credentials = base64.encodestring(settings.RECURLY_HTTP_AUTHENTICATION).strip()
         auth_string = 'Basic %s' % credentials
         
         environ = {
