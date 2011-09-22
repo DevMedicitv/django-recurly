@@ -119,6 +119,33 @@ class Account(models.Model):
         
         return account, subscription
     
+    @classmethod
+    def create_fake(class_, user, plan_code):
+        """Create a fake account for a user
+        
+        Creates an account which exists in Django, but not in Recurly. This can be 
+        handy for testing, or the occasional time when you just want to give someone 
+        a paid subscription without any fuss.
+        """
+        
+        account = class_.objects.create(
+            account_code="fake_%s" % random_string(32 - 5),
+            user=user,
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            canceled=False
+        )
+        
+        subscription = Subscription.objects.create(
+            account=account,
+            plan_code=plan_code
+        )
+        
+        signals.account_opened.send(sender=account, account=account, subscription=subscription)
+        
+        return account, subscription
+    
 
 class Subscription(models.Model):
     account = models.ForeignKey(Account)
