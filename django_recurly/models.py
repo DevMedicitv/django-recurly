@@ -210,7 +210,20 @@ class Subscription(models.Model):
         client.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
         self.plan_code = plan_code
         self.save()
+    
+    def terminate(self, refund="none"):
+        """Terminate the subscription
         
+        refund may be one of:
+            - "none" : No refund, subscription is just expired
+            - "partial" : Give a prorated refund
+            - "full" : Provide a full refund of the most recent charge
+        """
+        client.accounts.subscription.delete(account_code=self.account.account_code, data={"refund": refund})
+    
+    def cancel(self):
+        """Cancel the subscription, it will expire at the end of the current billing cycle"""
+        client.accounts.subscription.delete(account_code=self.account.account_code)
     
 
 
