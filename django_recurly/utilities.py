@@ -13,7 +13,11 @@ def modelify(data, model, key_prefix=""):
     fields.discard("id")
     
     if "user" in fields and data.get("username", None):
-        data["user"] = User.objects.get(username=data["username"])
+        try:
+            data["user"] = User.objects.get(username=data["username"])
+        except User.DoesNotExist:
+            # A user may not exist if there account has been deleted
+            data["user"] = None
     
     for k, v in data.items():
         if isinstance(v, dict):

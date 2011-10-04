@@ -30,8 +30,8 @@ class CurrentSubscriptionManager(models.Manager):
 
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
-    user = models.ForeignKey(User, related_name="recurly_accounts")
-    created_at = LocalizedDateTimeField(default=datetime.now(tz=pytz.utc))
+    user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
+    created_at = LocalizedDateTimeField(default=datetime.now())
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -219,10 +219,14 @@ class Subscription(models.Model):
             - "partial" : Give a prorated refund
             - "full" : Provide a full refund of the most recent charge
         """
-        client.accounts.subscription.delete(account_code=self.account.account_code, data={"refund": refund})
+        client = get_client()
+        
+        client.accounts.subscription.delete(account_code=self.account.account_code, refund=refund)
     
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current billing cycle"""
+        client = get_client()
+        
         client.accounts.subscription.delete(account_code=self.account.account_code)
     
 
