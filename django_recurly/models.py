@@ -30,7 +30,7 @@ class CurrentSubscriptionManager(models.Manager):
 
 class Account(models.Model):
     account_code = models.CharField(max_length=32, unique=True)
-    user = models.ForeignKey(User, related_name="recurly_account")
+    user = models.ForeignKey(User, related_name="recurly_accounts")
     created_at = LocalizedDateTimeField(default=datetime.now(tz=pytz.utc))
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
