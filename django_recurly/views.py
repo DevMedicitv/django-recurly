@@ -35,7 +35,7 @@ def push_notifications(request):
 
 @require_POST
 def change_plan(request):
-    new_plan = request.POST.get("new_plan")
+    new_plan = request.POST.get("plan_code")
     
     subscription = Account.get_current(request.user).get_current_subscription()
     subscription.change_plan(new_plan)

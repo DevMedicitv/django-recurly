@@ -114,6 +114,7 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.state, "expired")
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 700)
+        
         self.assertEqual(subscription.activated_at, datetime.datetime(2011, 9, 14, 19, 14, 14)) # Phew, its in UTC now :)
         
         # The subscription was created as 'expired' right away, so no signals
@@ -176,6 +177,88 @@ class SubscriptionModelTest(BaseTest):
         
         self.assertTrue(subscription.is_trial())
     
+
+class PaymentModelTest(BaseTest):
+    
+    def test_handle_payment_successful(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(data)
+        
+        data = self.parse_xml(self.push_notifications["successful_payment_notification-ok"])
+        payment = Payment.handle_notification(data)
+        
+        self.assertEqual(Payment.objects.count(), 1)
+        
+        payment = Payment.objects.all().latest()
+        self.assertEqual(payment.transaction_id, "a5143c1d3a6f4a8287d0e2cc1d4c0427")
+        self.assertEqual(payment.invoice_id, "ffc64d71d4b5404e93f13aac9c63bxxx")
+        self.assertEqual(payment.action, "purchase")
+        
+        self.assertEqual(payment.date, datetime.datetime(2009, 11, 22, 21, 10, 38)) # Phew, its in UTC now :)
+        self.assertEqual(payment.amount_in_cents, 1000)
+        self.assertEqual(payment.status, "success")
+        self.assertEqual(payment.message, "Bogus Gateway: Forced success")
+    
+    def test_handle_refund(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(data)
+        
+        data = self.parse_xml(self.push_notifications["successful_refund_notification-ok"])
+        payment = Payment.handle_notification(data)
+        
+        self.assertEqual(Payment.objects.count(), 1)
+        
+        payment = Payment.objects.all().latest()
+        self.assertEqual(payment.transaction_id, "2c7a2e30547e49869efd4e8a44b2be34")
+        self.assertEqual(payment.invoice_id, "ffc64d71d4b5404e93f13aac9c63b007")
+        self.assertEqual(payment.action, "credit")
+        
+        self.assertEqual(payment.amount_in_cents, 235)
+        self.assertEqual(payment.status, "success")
+        self.assertEqual(payment.message, "Bogus Gateway: Forced success")
+    
+    def test_handle_void(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(data)
+        
+        data = self.parse_xml(self.push_notifications["void_payment_notification-ok"])
+        payment = Payment.handle_notification(data)
+        
+        self.assertEqual(Payment.objects.count(), 1)
+        
+        payment = Payment.objects.all().latest()
+        self.assertEqual(payment.transaction_id, "4997ace0f57341adb3e857f9f7d15de8")
+        self.assertEqual(payment.invoice_id, "ffc64d71d4b5404e93f13aac9c63b007")
+        self.assertEqual(payment.action, "purchase")
+        
+        self.assertEqual(payment.amount_in_cents, 235)
+        self.assertEqual(payment.status, "void")
+        self.assertEqual(payment.message, "Test Gateway: Successful test transaction")
+    
+    def test_handle_failed(self):
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(data)
+        
+        data = self.parse_xml(self.push_notifications["failed_payment_notification-ok"])
+        payment = Payment.handle_notification(data)
+        
+        self.assertEqual(Payment.objects.count(), 1)
+        
+        payment = Payment.objects.all().latest()
+        self.assertEqual(payment.transaction_id, "a5143c1d3a6f4a8287d0e2cc1d4c0427")
+        self.assertEqual(payment.invoice_id, None)
+        self.assertEqual(payment.action, "purchase")
+        
+        self.assertEqual(payment.amount_in_cents, 1000)
+        self.assertEqual(payment.status, "declined")
+        self.assertEqual(payment.message, "This transaction has been declined")
+    
+
+
+
+
+
+
 
 
 

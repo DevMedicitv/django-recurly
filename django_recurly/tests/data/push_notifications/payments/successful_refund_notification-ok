@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <successful_refund_notification>
   <account>
-    <account_code>janedoe@gmail.com</account_code>
-    <username></username>
+    <account_code>verena@test.com</account_code>
+    <username>verena</username>
     <email>janedoe@gmail.com</email>
     <first_name>Jane</first_name>
     <last_name>Doe</last_name>

@@ -16,7 +16,7 @@ SUBSCRIPTION_STATES = (
     ("expired", "Expired"),       # Did not renews, or was forcibly expired early
 )
 
-__all__ = ("Account", "Subscription", "User")
+__all__ = ("Account", "Subscription", "User", "Payment")
 
 class CurrentAccountManager(models.Manager):
     def get_query_set(self):
@@ -146,6 +146,12 @@ class Account(models.Model):
         
         return account, subscription
     
+    def get_transactions(self):
+        client = get_client()
+        import pdb; pdb.set_trace();
+        response = client.accounts.transactions(account_code=self.account_code)
+        return response["transaction"]
+        
 
 class Subscription(models.Model):
     account = models.ForeignKey(Account)
@@ -153,7 +159,7 @@ class Subscription(models.Model):
     plan_version = models.IntegerField(default=1)
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
-    total_amount_in_cents = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=8) # NOT ALWAYS IN CENTS!
+    total_amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
     activated_at = LocalizedDateTimeField(blank=True, null=True)
     canceled_at = LocalizedDateTimeField(blank=True, null=True)
     expires_at = LocalizedDateTimeField(blank=True, null=True)
@@ -229,5 +235,55 @@ class Subscription(models.Model):
         
         client.accounts.subscription.delete(account_code=self.account.account_code)
     
+
+class Payment(models.Model):
+    
+    ACTION_CHOICES = (
+        ("purchase", "Purchase"),
+        ("credit", "Credit"),
+    )
+    
+    STATUS_CHOICES = (
+        ("success", "Success"),
+        ("declined", "Declined"),
+        ("void", "Void"),
+    )
+    
+    account = models.ForeignKey(Account, blank=True, null=True)
+    transaction_id = models.CharField(max_length=40)
+    invoice_id = models.CharField(max_length=40, blank=True, null=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    date = LocalizedDateTimeField(blank=True, null=True)
+    amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    message = models.CharField(max_length=250)
+    
+    class Meta:
+        ordering = ["-id"]
+        get_latest_by = "id"
+    
+    @classmethod
+    def handle_notification(class_, data):
+        transaction = data.get("transaction")
+        account_code = data["account"]["account_code"]
+        
+        transaction_data = modelify(transaction, class_, remove_empty=True, date_fields=["date"])
+        
+        transaction_data["transaction_id"] = transaction["id"]
+        transaction_data["account"] = Account.objects.get(account_code=account_code)
+        
+        payment, created = class_.objects.get_or_create(
+            transaction_id=transaction["id"],
+            defaults=transaction_data
+        )
+        
+        return payment
+    
+
+
+
+
+
+
 
 

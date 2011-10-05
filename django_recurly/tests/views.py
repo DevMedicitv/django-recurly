@@ -14,6 +14,11 @@ class PushNotificationViewTest(BaseTest):
     def test_all(self):
         
         for name, xml in self.push_notifications.items():
+            if "_refund_" in name or "_payment_" in name:
+                # This is a payment notification, for which we need an account to exist
+                request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"], content_type="text/xml")
+                response = views.push_notifications(request)
+            
             signal, t = name.split("-")
             request = rf.post("/junk", xml, content_type="text/xml")
             
