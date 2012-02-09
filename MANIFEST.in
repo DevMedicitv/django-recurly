@@ -1,0 +1,5 @@
+include VERSION
+include COPYING
+include *.py
+recursive-include django_recurly *.py *.html
+recursive-include django_recurly/tests/data *
