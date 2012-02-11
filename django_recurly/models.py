@@ -148,7 +148,6 @@ class Account(models.Model):
     
     def get_transactions(self):
         client = get_client()
-        import pdb; pdb.set_trace();
         response = client.accounts.transactions(account_code=self.account_code)
         return response["transaction"]
         
