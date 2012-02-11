@@ -11,7 +11,7 @@ setup(
     url="https://github.com/adamcharnock/django-recurly",
     author="Adam Charnock",
     author_email="adam@playnice.ly",
-    description="Django integration for Recurly, a subscription billing service."
+    description="Django integration for Recurly, a subscription billing service.",
     
     install_requires=[
         "iso8601",
