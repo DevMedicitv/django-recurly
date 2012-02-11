@@ -1,5 +1,16 @@
 ----
 
+Version 1.0.2, Sat 11 Feb 2012
+===============================
+
+7c5bb1f71c	Removing stray debug line (Adam Charnock)
+a7c25dfd3b	Fixing syntax error (Adam Charnock)
+d1e03a42e1	Adding package description (Adam Charnock)
+8e1b8e2327	Updating package metadata (Adam Charnock)
+b72c463bc4	adding 'dist' to gitignore (Adam Charnock)
+
+
+
 Version 1.0.1, Sat 11 Feb 2012
 ===============================
 
