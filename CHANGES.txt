@@ -1,0 +1,9 @@
+----
+
+Version 1.0.1, Sat 11 Feb 2012
+===============================
+
+eab1208782	Minor adjustment to package layout (Adam Charnock)
+c518b93098	Updating Manifest (Adam Charnock)
+
+
