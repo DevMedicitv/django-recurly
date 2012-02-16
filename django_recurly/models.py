@@ -10,6 +10,9 @@ from django_recurly.utilities import random_string, modelify
 from django_recurly import signals
 from django_recurly.client import get_client
 
+# Do these here to ensure the handlers get hooked up
+import django_recurly.handlers
+
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
     ("canceled", "Canceled"),   # Still active, but will not be renewed

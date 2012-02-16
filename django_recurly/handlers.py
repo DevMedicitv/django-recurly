@@ -1,7 +1,6 @@
 # Hook up the signals to the relevant actions
 
 from django_recurly import signals
-from django_recurly import models
 
 def new(data, **kwargs):
     """Create the account and the subscription
@@ -9,13 +8,16 @@ def new(data, **kwargs):
     We do these at the same time (rather than using 
     the new_account signal) to avoid concurrency problems.
     """
+    from django_recurly import models
     models.Account.handle_notification(data)
 
 def update(data, **kwargs):
     """Update a subscription and account"""
+    from django_recurly import models
     models.Account.handle_notification(data)
 
 def payment(data, **kwargs):
+    from django_recurly import models
     models.Payment.handle_notification(data)
 
 signals.new_subscription_notification.connect(new)
