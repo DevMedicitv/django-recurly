@@ -1,5 +1,11 @@
 ----
 
+Version 1.0.3, Thu 16 Feb 2012
+===============================
+
+ae48c5f1dc	Updating includes to allow for import of django_recurly without any dependencies (Adam Charnock)
+
+
 Version 1.0.2, Sat 11 Feb 2012
 ===============================
 
