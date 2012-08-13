@@ -33,6 +33,7 @@ class JsonEncoder(json.JSONEncoder):
 def dump(obj):
     return json.dumps(
         obj.to_dict(),
+        sort_keys=True,
         indent=4,
         cls=JsonEncoder)
 
