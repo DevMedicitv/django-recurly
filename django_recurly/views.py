@@ -1,4 +1,4 @@
-from django.http import HttpResponse, HttpResponseBadRequest, Http404
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -11,6 +11,7 @@ from .decorators import recurly_basic_authentication
 from . import signals
 
 logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
 @recurly_basic_authentication
