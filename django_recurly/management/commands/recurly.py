@@ -30,6 +30,13 @@ class JsonEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+def dump(obj):
+    return json.dumps(
+        obj.to_dict(),
+        indent=4,
+        cls=JsonEncoder)
+
+
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--accounts',
@@ -56,28 +63,19 @@ class Command(BaseCommand):
 
         if options['accounts']:
             for account in recurly.Account().all_active():
-                print(json.dumps(account.to_dict(), indent=4, cls=JsonEncoder))
+                print(dump(account))
 
         elif options['subscriptions']:
             for subscription in recurly.Subscription().all():
-                print(json.dumps(
-                    subscription.to_dict(),
-                    indent=4,
-                    cls=JsonEncoder))
+                print(dump(subscription))
 
         elif options['account']:
             account = recurly.Account().get(options['account'])
-            print(json.dumps(
-                account.to_dict(),
-                indent=4,
-                cls=JsonEncoder))
+            print(dump(account))
 
         elif options['subscription']:
             subscription = recurly.Subscription().get(options['subscription'])
-            print(json.dumps(
-                subscription.to_dict(),
-                indent=4,
-                cls=JsonEncoder))
+            print(dump(subscription))
 
         else:
             self.print_help(None, None)
