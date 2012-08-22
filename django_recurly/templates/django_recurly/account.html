@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% load recurly_api %}
+
+{% block body %}
+<div class="recurly_account">
+    <h2>Your account</h2>
+
+    <div class="upgrade">
+        <h3>Upgrade / Downgrade</h3>
+        
+        {% for plan_code in plans %}
+            <div class="plan" id="plan-{{ plan_code }}">
+                <h4>{{ plan_code }}</h4>
+                {% change_plan_form plan_code %}
+            </div>
+        {% endfor %}
+    </div>
+    
+    
+</div>
+{% endblock %}

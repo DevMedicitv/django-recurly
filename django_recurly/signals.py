@@ -2,6 +2,16 @@
 
 from django.dispatch import Signal
 
+## General use signals ##
+
+# Fired when a user gains a valid (i.e. current) account
+account_opened = Signal(providing_args=('account','subscription'))
+
+# Fired when a user's valid (i.e. current) account stops being valid (i.e. is 'expired')
+account_closed = Signal(providing_args=('account','subscription'))
+
+## Notifications from recurly ##
+
 # Accounts
 new_account_notification = Signal(
         providing_args=('account','xml','type',))

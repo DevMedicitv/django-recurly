@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<expired_subscription_notification>
+  <account>
+    <account_code>vKWanguTh5KcZniN0yZeFbjD8xmFfVGT</account_code>
+    <username>verena</username>
+    <email>adam@continuous.io</email>
+    <first_name>Adam</first_name>
+    <last_name>Charnock</last_name>
+    <company_name nil="true"></company_name>
+  </account>
+  <subscription>
+    <plan>
+      <plan_code>micro</plan_code>
+      <name>Micro</name>
+    </plan>
+    <state>expired</state>
+    <quantity type="integer">1</quantity>
+    <total_amount_in_cents type="integer">700</total_amount_in_cents>
+    <activated_at type="datetime">2011-09-14T19:14:14Z</activated_at>
+    <canceled_at type="datetime">2011-09-14T19:43:09Z</canceled_at>
+    <expires_at type="datetime">2011-09-14T19:43:09Z</expires_at>
+    <current_period_started_at type="datetime">2011-09-14T19:14:14Z</current_period_started_at>
+    <current_period_ends_at type="datetime">2011-10-14T19:14:14Z</current_period_ends_at>
+    <trial_started_at type="datetime"></trial_started_at>
+    <trial_ends_at type="datetime"></trial_ends_at>
+  </subscription>
+</expired_subscription_notification>

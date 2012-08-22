@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<failed_payment_notification>
+  <account>
+    <account_code>verena@test.com</account_code>
+    <username>verena</username>
+    <email>verena@test.com</email>
+    <first_name>Verena</first_name>
+    <last_name>Test</last_name>
+    <company_name>Company, Inc.</company_name>
+  </account>
+  <transaction>
+    <id>a5143c1d3a6f4a8287d0e2cc1d4c0427</id>
+    <invoice_id nil="true"></invoice_id>
+    <action>purchase</action>
+    <date type="datetime">2009-11-22T13:10:38-08:00</date>
+    <amount_in_cents type="integer">1000</amount_in_cents>
+    <status>Declined</status>
+    <message>This transaction has been declined</message>
+    <reference></reference>
+    <cvv_result code=""></cvv_result>
+    <avs_result code=""></avs_result>
+    <avs_result_street></avs_result_street>
+    <avs_result_postal></avs_result_postal>
+    <test type="boolean">true</test>
+    <voidable type="boolean">false</voidable>
+    <refundable type="boolean">false</refundable>
+  </transaction>
+</failed_payment_notification>
