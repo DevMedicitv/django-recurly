@@ -74,11 +74,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        if options['accounts']:
+        if options['account']:
             account = recurly.Account().get(options['account'])
             print(dump(account))
 
-        elif options['account']:
+        elif options['accounts']:
             for account in recurly.Account().all_active():
                 print(dump(account))
 

@@ -10,7 +10,7 @@ from django.utils.crypto import constant_time_compare
 
 import logging
 
-import recurly
+from django_recurly import recurly
 from recurly import objects_for_push_notification
 
 from .decorators import recurly_basic_authentication

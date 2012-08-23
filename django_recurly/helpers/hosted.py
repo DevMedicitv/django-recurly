@@ -8,7 +8,7 @@ from django.utils.http import urlquote_plus
 from django.utils.encoding import iri_to_uri
 from django.http import HttpResponseRedirect
 
-from django_recurly.client import get_client
+from django_recurly import recurly
 from django_recurly.utils import random_string
 
 SUBSCRIBE_URL = "https://%(subdomain)s.recurly.com/subscribe/%(plan_code)s/%(account_code)s/%(username)s?quantity=%(quantity)s&first_name=%(first_name)s&last_name=%(last_name)s&email=%(email)s"
@@ -22,7 +22,7 @@ def get_subscribe_url(user, plan_code, quantity=1, account_code=None):
     """
 
     params = {
-        "subdomain": get_client().subdomain,
+        "subdomain": settings.RECURLY_SUBDOMAIN,
         "plan_code": urlquote_plus(plan_code),
         "account_code": urlquote_plus(account_code) if account_code else random_string(length=32),
         "username": urlquote_plus(user.username),

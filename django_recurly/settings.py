@@ -5,8 +5,10 @@ import os.path
 # These should NOT be valid credentials
 API_KEY = 'dummy_api_key'
 JS_PRIVATE_KEY = "dummy_js_private_key"
-
+CA_CERTS_FILE = ''
 DEFAULT_CURRENCY = 'USD'
+
+RECURLY_SUBDOMAIN = 'example'
 
 RECURLY_PLANS = ("micro", "small", "medium", "large")
 

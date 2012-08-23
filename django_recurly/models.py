@@ -8,6 +8,7 @@ from timezones.fields import LocalizedDateTimeField
 
 from django_recurly.utils import random_string, modelify
 from django_recurly import signals
+from django_recurly import recurly
 
 # Do these here to ensure the handlers get hooked up
 import django_recurly.handlers
@@ -149,8 +150,7 @@ class Account(models.Model):
         return account, subscription
 
     def get_transactions(self):
-        client = get_client()
-        response = client.accounts.transactions(account_code=self.account_code)
+        response = recurly.accounts.transactions(account_code=self.account_code)
         return response["transaction"]
 
 
@@ -207,14 +207,13 @@ class Subscription(models.Model):
 
         This will call the Recurly API.
         """
-        client = get_client()
 
         update_data = {
             "timeframe": "now",
             "plan_code": plan_code
         }
 
-        client.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
+        recurly.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
         self.plan_code = plan_code
         self.save()
 
@@ -226,15 +225,13 @@ class Subscription(models.Model):
             - "partial" : Give a prorated refund
             - "full" : Provide a full refund of the most recent charge
         """
-        client = get_client()
 
-        client.accounts.subscription.delete(account_code=self.account.account_code, refund=refund)
+        recurly.accounts.subscription.delete(account_code=self.account.account_code, refund=refund)
 
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current billing cycle"""
-        client = get_client()
 
-        client.accounts.subscription.delete(account_code=self.account.account_code)
+        recurly.accounts.subscription.delete(account_code=self.account.account_code)
 
 
 class Payment(models.Model):
