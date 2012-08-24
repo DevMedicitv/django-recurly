@@ -1,6 +1,6 @@
 import functools
 
-from django.conf import settings
+from django_recurly.conf import HTTP_AUTHENTICATION
 from django.http import HttpResponse, HttpResponseBadRequest, \
     HttpResponseForbidden
 from django.utils.crypto import constant_time_compare
@@ -8,7 +8,7 @@ from django.utils.crypto import constant_time_compare
 def recurly_basic_authentication(fn):
     @functools.wraps(fn)
     def wrapper(request, *args, **kwargs):
-        authentication = getattr(settings, 'RECURLY_HTTP_AUTHENTICATION', None)
+        authentication = HTTP_AUTHENTICATION
 
         # If the user has not setup settings.RECURLY_HTTP_AUTHENTICATION then
         # we trust they are doing it at the web server level.

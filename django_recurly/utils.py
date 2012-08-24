@@ -5,13 +5,13 @@ import string
 import iso8601
 import pytz
 
-from django.conf import settings
+from django_recurly.conf import SUBDOMAIN
 from django.shortcuts import redirect
 from django.contrib.auth.models import User
 
 def hosted_login_url(hosted_login_token):
     return 'https://%s.recurly.com/account/%s' % (
-        settings.RECURLY_SUBDOMAIN,
+        SUBDOMAIN,
         hosted_login_token,
     )
 
@@ -20,7 +20,7 @@ def hosted_payment_page_url(plan_code, account_code, data=None):
         data = {}
 
     return 'https://%s.recurly.com/subscribe/%s/%d?%s' % (
-        settings.RECURLY_SUBDOMAIN,
+        SUBDOMAIN,
         plan_code,
         account_code,
         urllib.urlencode(data),

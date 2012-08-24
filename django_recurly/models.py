@@ -1,14 +1,11 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django_extensions.db.models import TimeStampedModel
 from datetime import datetime
-import pytz
-
-from timezones.fields import LocalizedDateTimeField
 
 from django_recurly.utils import random_string, modelify
-from django_recurly import signals
-from django_recurly import recurly
+from django_recurly import recurly, signals
 
 # Do these here to ensure the handlers get hooked up
 import django_recurly.handlers
@@ -31,10 +28,9 @@ class CurrentSubscriptionManager(models.Manager):
         return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(super_subscription=True) | Q(state__in=("active", "canceled")))
 
 
-class Account(models.Model):
+class Account(TimeStampedModel):
     account_code = models.CharField(max_length=32, unique=True)
     user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
-    created_at = LocalizedDateTimeField(default=datetime.now())
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -161,13 +157,13 @@ class Subscription(models.Model):
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
     total_amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
-    activated_at = LocalizedDateTimeField(blank=True, null=True)
-    canceled_at = LocalizedDateTimeField(blank=True, null=True)
-    expires_at = LocalizedDateTimeField(blank=True, null=True)
-    current_period_started_at = LocalizedDateTimeField(blank=True, null=True)
-    current_period_ends_at = LocalizedDateTimeField(blank=True, null=True)
-    trial_started_at = LocalizedDateTimeField(blank=True, null=True)
-    trial_ends_at = LocalizedDateTimeField(blank=True, null=True)
+    activated_at = models.DateTimeField(blank=True, null=True)
+    canceled_at = models.DateTimeField(blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    current_period_started_at = models.DateTimeField(blank=True, null=True)
+    current_period_ends_at = models.DateTimeField(blank=True, null=True)
+    trial_started_at = models.DateTimeField(blank=True, null=True)
+    trial_ends_at = models.DateTimeField(blank=True, null=True)
 
     super_subscription = models.BooleanField(default=False)
 
@@ -196,7 +192,7 @@ class Subscription(models.Model):
         if not self.trial_started_at or not self.trial_ends_at:
             return False # No trial dates, so not a trial
 
-        now = datetime.now(tz=pytz.utc)
+        now = datetime.now()
         if self.trial_started_at <= now and self.trial_ends_at > now:
             return True
         else:
@@ -251,7 +247,7 @@ class Payment(models.Model):
     transaction_id = models.CharField(max_length=40)
     invoice_id = models.CharField(max_length=40, blank=True, null=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    date = LocalizedDateTimeField(blank=True, null=True)
+    date = models.DateTimeField(blank=True, null=True)
     amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     message = models.CharField(max_length=250)

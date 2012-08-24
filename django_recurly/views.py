@@ -5,16 +5,12 @@ from django.template import RequestContext
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from django.conf import settings
 from django.utils.crypto import constant_time_compare
 
 import logging
 
-from django_recurly import recurly
-from recurly import objects_for_push_notification
-
 from .decorators import recurly_basic_authentication
-from . import signals
+from . import recurly, signals
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +23,7 @@ def push_notifications(request):
     logger.debug(request.raw_post_data)
 
     xml = request.raw_post_data
-    objects = objects_for_push_notification(xml)
+    objects = recurly.objects_for_push_notification(xml)
 
     try:
         signal = getattr(signals, objects['type'])
@@ -52,11 +48,12 @@ def change_plan(request):
 def account(request):
     account = Account.get_current(request.user)
     subscription = account.get_current_subscription()
+    plans = [plan.name for plan in recurly.Plan().all()]
 
     c = {
         "account": account,
         "subscription": subscription,
-        "plans": settings.RECURLY_PLANS
+        "plans": plans
     }
 
     return render_to_response("django_recurly/account.html", c, RequestContext(request))

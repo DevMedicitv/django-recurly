@@ -5,9 +5,9 @@ import base64
 
 from django.test import TestCase
 from django.test.client import Client
-from django.conf import settings
 from django.core.handlers.wsgi import WSGIRequest
 
+from django_recurly.conf import HTTP_AUTHENTICATION
 from django_recurly import signals
 from django_recurly.models import *
 
@@ -70,13 +70,13 @@ class BaseTest(TestCase):
 
         recurly.parse_notification(xml)
 
-        return recurly.response
+        return recurly.response()
 
 
 class RequestFactory(Client):
     # Used to generate request objects.
     def request(self, **request):
-        credentials = base64.encodestring(settings.RECURLY_HTTP_AUTHENTICATION).strip()
+        credentials = base64.encodestring(HTTP_AUTHENTICATION).strip()
         auth_string = 'Basic %s' % credentials
 
         environ = {
