@@ -1,0 +1,11 @@
+{% load recurly_js %}
+
+<script language="javascript">
+{% autoescape off %}
+    {% recurly_config %}
+
+    {% block recurly_js %}
+        {% subscription_form plan_code %}
+    {% endblock %}
+{% endautoescape %}
+</script>

@@ -1,5 +1,10 @@
-include VERSION
+include CHANGES.txt
 include COPYING
-include *.py
-recursive-include django_recurly *.py *.html
+include MANIFEST.in
+include README
+include README.rst
+recursive-include django_recurly *.py
+recursive-include django_recurly/templates *
 recursive-include django_recurly/tests/data *
+recursive-include requirements *.txt
+prune django_recurly/*.pyc

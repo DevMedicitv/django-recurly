@@ -1,4 +1,4 @@
-"""Template tags for working work Recurly's API"""
+"""Template tags for working with Recurly's API"""
 
 from django import template
 from django.template import Library, Node, Variable, loader

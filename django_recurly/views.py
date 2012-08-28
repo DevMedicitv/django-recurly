@@ -25,6 +25,8 @@ def push_notifications(request):
     xml = request.raw_post_data
     objects = recurly.objects_for_push_notification(xml)
 
+    logger.debug(objects)
+
     try:
         signal = getattr(signals, objects['type'])
     except AttributeError:

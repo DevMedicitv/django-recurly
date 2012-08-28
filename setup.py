@@ -15,6 +15,8 @@ setup(
 
     install_requires=[
         "iso8601",
-        "django-timezones",
-    ]
+        "recurly"
+    ],
+
+    include_package_data=True,
 )

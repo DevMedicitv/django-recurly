@@ -1,4 +1,4 @@
-"""Template tags for working work Recurly's hosted payment pages"""
+"""Template tags for working with Recurly's hosted payment pages"""
 
 from django import template
 from django.template import Library, Node, Variable, loader
