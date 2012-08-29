@@ -14,7 +14,6 @@ from . import recurly, signals
 
 logger = logging.getLogger(__name__)
 
-
 @csrf_exempt
 @recurly_basic_authentication
 @require_POST
@@ -23,8 +22,9 @@ def push_notifications(request):
     logger.debug(request.raw_post_data)
 
     xml = request.raw_post_data
-    objects = recurly.objects_for_push_notification(xml)
+    objects = recurly.objects_for_push_notification(xml.strip())
 
+    logger.debug("Notification objects: ")
     logger.debug(objects)
 
     try:

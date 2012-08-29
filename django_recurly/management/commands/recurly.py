@@ -1,41 +1,10 @@
-import datetime
-import json
 import sys
 
 from django.core.management.base import BaseCommand
 from optparse import make_option
 
+from django_recurly.util import dump
 from django_recurly import recurly
-
-class JsonEncoder(json.JSONEncoder):
-    def default(self, obj):
-
-        if isinstance(obj, datetime.datetime) or \
-                isinstance(obj, recurly.resource.Money):
-            return str(obj)
-
-        if callable(obj):
-            return obj().to_dict()
-
-        if isinstance(obj, recurly.SubscriptionAddOn):
-            return obj.to_dict()
-
-        try:
-            if issubclass(obj, dict) or issubclass(obj, list):
-                return list(obj)
-        except:
-            pass
-
-        return json.JSONEncoder.default(self, obj)
-
-
-def dump(obj):
-    return json.dumps(
-        obj.to_dict(),
-        sort_keys=True,
-        indent=4,
-        cls=JsonEncoder)
-
 
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (

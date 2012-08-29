@@ -1,24 +1,31 @@
-# Hook up the signals to the relevant actions
+"""
+Push notifications are not meant to be actionable and should not be used for
+critical account functions like provisioning accounts. Use the receipt of a
+push notification to trigger an API query, validating both the push
+notification action and the details of the action.
+
+http://docs.recurly.com/push-notifications
+"""
 
 from django_recurly import signals
 
-def new(data, **kwargs):
+def new(sender, **kwargs):
     """Create the account and the subscription
-    
-    We do these at the same time (rather than using 
+
+    We do these at the same time (rather than using
     the new_account signal) to avoid concurrency problems.
     """
     from django_recurly import models
-    models.Account.handle_notification(data)
+    models.Account.handle_notification(**kwargs)
 
-def update(data, **kwargs):
+def update(sender, **kwargs):
     """Update a subscription and account"""
     from django_recurly import models
-    models.Account.handle_notification(data)
+    models.Account.handle_notification(**kwargs)
 
-def payment(data, **kwargs):
+def payment(sender, **kwargs):
     from django_recurly import models
-    models.Payment.handle_notification(data)
+    models.Payment.handle_notification(**kwargs)
 
 signals.new_subscription_notification.connect(new)
 signals.updated_subscription_notification.connect(update)
