@@ -80,6 +80,12 @@ class Account(TimeStampedModel):
         recurly_account = recurly.Account().get(kwargs.get("account").account_code)
         account = modelify(recurly_account, class_)
 
+        try:
+            account.user = User.objects.get(username=recurly_account.username)
+        except User.DoesNotExist:
+            # It's possible that a user may not exist locally (e.g. deleted auth.models.User)
+            account.user = None
+
         account.save()
 
         # Now get/create the subscription
@@ -333,6 +339,6 @@ def modelify(resource, model, remove_empty=False):
             setattr(obj, k, v)
 
         return obj
-    except User.DoesNotExist:
+    except model.DoesNotExist:
         logger.debug("Returning new %s object" % model)
         return model(**update)
