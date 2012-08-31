@@ -4,8 +4,10 @@ from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
 from datetime import datetime
 
-from django_recurly.utils import random_string, dump
+from django_recurly.utils import random_string
 from django_recurly import recurly, signals
+
+import json
 
 # Do these here to ensure the handlers get hooked up
 import django_recurly.handlers
@@ -15,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
-    ("canceled", "Canceled"),   # Still active, but will not be renewed
+    ("canceled", "Canceled"),     # Still active, but will not be renewed
     ("expired", "Expired"),       # Did not renews, or was forcibly expired early
 )
 
@@ -55,16 +57,26 @@ class Account(TimeStampedModel):
         An account may have multiple subscriptions in cases
         where old subscriptions expired.
 
-        If you need the current subscription, consider
-        using get_current_subscription()
+        If you need the active subscriptions, consider
+        using get_current_subscriptions()
         """
         return self.subscription_set.all()
 
-    def get_current_subscription(self):
+    def get_current_subscriptions(self):
+        try:
+            return Subscription.current.filter(account=self)
+        except Subscription.DoesNotExist:
+            return None
+
+    def get_latest_subscription(self):
         try:
             return Subscription.current.filter(account=self).latest()
         except Subscription.DoesNotExist:
             return None
+
+    def get_transactions(self):
+        response = recurly.accounts.transactions(account_code=self.account_code)
+        return response["transaction"]
 
     def fetch_hosted_login_token(self):
         raise NotImplemented("Well, it's not. Sorry.")
@@ -149,10 +161,6 @@ class Account(TimeStampedModel):
 
         return account, subscription
 
-    def get_transactions(self):
-        response = recurly.accounts.transactions(account_code=self.account_code)
-        return response["transaction"]
-
 
 class Subscription(models.Model):
     account = models.ForeignKey(Account)
@@ -203,14 +211,20 @@ class Subscription(models.Model):
         else:
             return False
 
-    def change_plan(self, plan_code):
+    def change_plan(self, plan_code, timeframe='now'):
         """Change this subscription to the specified plan_code.
 
-        This will call the Recurly API.
+        This will call the Recurly API and update the subscription.
+
+        `timeframe` may be one of:
+            - 'now' : A prorated charge or credit is calculated and the
+                      subscription is updated immediately.
+            - 'renewal': Invoicing is delayed until next billing cycle. Use
+                         the pending updates to provision
         """
 
         update_data = {
-            "timeframe": "now",
+            "timeframe": timeframe,
             "plan_code": plan_code
         }
 
@@ -218,10 +232,27 @@ class Subscription(models.Model):
         self.plan_code = plan_code
         self.save()
 
+    def change_quantity(self, quantity=1, incremental=False):
+        """Change this subscription quantity. The quantity will be changed to
+        `quantity` if `incremental` is `False`, and increment the quantity by
+        `quantity` if `incremental` is `True`.
+
+        This will call the Recurly API and update the subscription.
+        """
+
+        update_data = {
+            "timeframe": timeframe,
+            "quantity": quantity if not incremental else self.quantity + quantity
+        }
+
+        recurly.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
+        self.quantity = update_data['quantity']
+        self.save()
+
     def terminate(self, refund="none"):
         """Terminate the subscription
 
-        refund may be one of:
+        `refund` may be one of:
             - "none" : No refund, subscription is just expired
             - "partial" : Give a prorated refund
             - "full" : Provide a full refund of the most recent charge
@@ -234,7 +265,7 @@ class Subscription(models.Model):
 
         recurly.accounts.subscription.delete(account_code=self.account.account_code)
 
-
+# TODO: Make this map more closely with Recurly, or remove it. Why store this stuff?
 class Payment(models.Model):
 
     ACTION_CHOICES = (
@@ -252,7 +283,7 @@ class Payment(models.Model):
     transaction_id = models.CharField(max_length=40)
     invoice_id = models.CharField(max_length=40, blank=True, null=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    date = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
     amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     message = models.CharField(max_length=250)
@@ -266,20 +297,16 @@ class Payment(models.Model):
         recurly_transaction = recurly.Transaction().get(kwargs.get("transaction").id)
         recurly_account = recurly.Account().get(kwargs.get("account").account_code)
 
-        payment = modelify(transaction, class_, remove_empty=True)
+        payment = modelify(recurly_transaction, class_, remove_empty=True)
 
-        payment.transaction_id = recurly_transaction.id
+        payment.transaction_id = recurly_transaction.uuid
+        payment.invoice_id = recurly_transaction.invoice().uuid
         payment.account = modelify(recurly_account, Account)
 
-        print "Transaction Data:"
-        print transaction_data
-
-        payment, created = class_.objects.get_or_create(
-            transaction_id=transaction_data["transaction_id"],
-            defaults=transaction_data
-        )
+        payment.save()
 
         return payment
+
 
 # TODO: Make this smarter, not necessary
 MODEL_MAP = {
@@ -288,7 +315,6 @@ MODEL_MAP = {
     'subscription': Subscription,
     'transaction': Payment,
 }
-
 
 def modelify(resource, model, remove_empty=False):
     fields = set(field.name for field in model._meta.fields)
@@ -320,7 +346,9 @@ def modelify(resource, model, remove_empty=False):
                 unique_fields[k] = v
 
             if k == "date" or k.endswith("_at"):
-                print "%s: %s" % (k, v)
+                pass
+                # TODO: Make sure dates are always in UTC and are aware
+                #print "%s: %s" % (k, v)
                 #v = iso8601.parse_date(v) if v else None
 
             # Always assume fields with limited choices should be lower case

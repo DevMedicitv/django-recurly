@@ -3,10 +3,13 @@ from django.template.loader import render_to_string
 
 from django_recurly.conf import SUBDOMAIN, DEFAULT_CURRENCY
 from django_recurly.models import Account, Subscription
+from django_recurly.utils import dump, to_camel
 from django_recurly import recurly
+
 
 def get_signature(obj):
     return recurly.js.sign(obj)
+
 
 def get_config(subdomain=SUBDOMAIN, currency=DEFAULT_CURRENCY):
     return render_to_string("django_recurly/config.js", {
@@ -14,14 +17,54 @@ def get_config(subdomain=SUBDOMAIN, currency=DEFAULT_CURRENCY):
         "currency": currency,
     })
 
-def get_subscription_form(plan_code, account=None):
+
+def get_subscription_form(plan_code, account=None, target_element='#recurly-container', success_handler=None):
+    # Protected params
     data = {
-        'subscription': recurly.Subscription(plan_code=plan_code).to_dict()
+        'plan_code': plan_code,
+        'subscription': {
+            'plan_code': plan_code
+        },
+        'addressRequirement': 'none',
+        'enableCoupons': False,
     }
 
     data['signature'] = get_signature(data)
 
+    # Unprotected params
+    data['target'] = target_element
+
     if account is not None:
-        data['account'] = recurly.Account(username=account.username, first_name=account.first_name, last_name=account.last_name, email=account.email).to_dict();
+        data['account'] = account.to_dict()
+
+    if success_handler is not None:
+        data['success_handler'] = success_handler
+
+    data['json'] = dump(to_camel(data))
 
     return render_to_string("django_recurly/build_subscription_form.js", data)
+
+
+def get_billing_info_update_form(account, target_element='#recurly-container', success_handler=None):
+    # Protected params
+    data = {
+        'account': {
+            'account_code': account.account_code
+        }
+    }
+
+    data['signature'] = get_signature(data)
+
+    # Unprotected params
+    data['target'] = target_element
+
+    data['account_code'] = account.account_code
+    data['account'] = account
+    data['billing_info'] = account.billing_info
+
+    if success_handler is not None:
+        data['success_handler'] = success_handler
+
+    data['json'] = dump(to_camel(data))
+
+    return render_to_string("django_recurly/build_billing_form.js", data)

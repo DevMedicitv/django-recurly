@@ -4,6 +4,7 @@ import random
 import string
 import iso8601
 import json
+import re
 from datetime import datetime
 
 from django.shortcuts import redirect
@@ -14,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class JsonEncoder(json.JSONEncoder):
+class RecurlyJsonEncoder(json.JSONEncoder):
     def default(self, obj):
 
         if isinstance(obj, datetime) or \
@@ -37,18 +38,27 @@ class JsonEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def dump(obj):
+def dump(obj, encoder=RecurlyJsonEncoder, js=False):
     data = obj
     try:
         data = data.to_dict()
     except AttributeError:
         pass
 
-    return json.dumps(
-        data,
-        sort_keys=True,
-        indent=4,
-        cls=JsonEncoder)
+    if js:
+        return json.dumps(
+            data,
+            sort_keys=True,
+            indent=2,
+            cls=encoder,
+            separators=(', ', ': '))
+    else:
+        return json.dumps(
+            data,
+            sort_keys=True,
+            indent=2,
+            cls=encoder)
+
 
 
 def hosted_login_url(hosted_login_token):
@@ -86,3 +96,47 @@ def safe_redirect(url, fallback="/"):
 
 def random_string(length=32):
     return ''.join(random.choice(string.letters + string.digits) for i in xrange(length))
+
+
+def to_camel(data):
+    def underscore_to_camel(match):
+        return match.group()[0] + match.group()[2].upper()
+
+    def camelize(data):
+        if type(data) == type({}):
+            new_dict = {}
+            for key, value in data.items():
+                new_key = re.sub(r"[a-z]_[a-z]", underscore_to_camel, key)
+                new_dict[new_key] = camelize(value)
+            return new_dict
+        if type(data) in (type([]), type(())):
+            for i in range(len(data)):
+                data[i] = camelize(data[i])
+            return data
+        return data
+
+    return camelize(data)
+
+def from_camel(content):
+    # Changes camelCase json names to object containing underscore_separated names
+    data = json.loads(content)
+
+    def camel_to_underscore(match):
+        return match.group()[0] + "_" + match.group()[1].lower()
+
+    def underscorize(data):
+        if type(data) == type({}):
+            new_dict = {}
+            for key, value in data.items():
+                new_key = re.sub(r"[a-z][A-Z]", camel_to_underscore, key)
+                new_dict[new_key] = underscorize(value)
+            return new_dict
+        if type(data) in (type([]), type(())):
+            for i in range(len(data)):
+                data[i] = underscorize(data[i])
+            return data
+        return data
+
+    underscored_data = underscorize(data)
+
+    return underscored_data

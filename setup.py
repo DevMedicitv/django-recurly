@@ -13,10 +13,10 @@ setup(
     author_email="ian@sprint.ly",
     description="Django integration for Recurly, a subscription billing service.",
 
-    install_requires=[
-        "iso8601",
-        "recurly"
-    ],
+    # install_requires=[
+    #     "iso8601",
+    #     "recurly"
+    # ],
 
     include_package_data=True,
 )
