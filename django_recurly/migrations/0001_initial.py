@@ -19,7 +19,7 @@ class Migration(SchemaMigration):
             ('first_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('last_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('company_name', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
-            ('canceled', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('state', self.gf('django.db.models.fields.CharField')(default='active', max_length=20)),
             ('hosted_login_token', self.gf('django.db.models.fields.CharField')(max_length=32, null=True, blank=True)),
         ))
         db.send_create_signal('django_recurly', ['Account'])
@@ -28,11 +28,13 @@ class Migration(SchemaMigration):
         db.create_table('django_recurly_subscription', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('account', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['django_recurly.Account'])),
+            ('uuid', self.gf('django.db.models.fields.CharField')(unique=True, max_length=40)),
             ('plan_code', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('plan_version', self.gf('django.db.models.fields.IntegerField')(default=1)),
             ('state', self.gf('django.db.models.fields.CharField')(default='active', max_length=20)),
             ('quantity', self.gf('django.db.models.fields.IntegerField')(default=1)),
-            ('total_amount_in_cents', self.gf('django.db.models.fields.IntegerField')(null=True, blank=True)),
+            ('unit_amount_in_cents', self.gf('django.db.models.fields.IntegerField')(null=True, blank=True)),
+            ('currency', self.gf('django.db.models.fields.CharField')(default='USD', max_length=3)),
             ('activated_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('canceled_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('expires_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
@@ -40,7 +42,6 @@ class Migration(SchemaMigration):
             ('current_period_ends_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('trial_started_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('trial_ends_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
-            ('super_subscription', self.gf('django.db.models.fields.BooleanField')(default=False)),
         ))
         db.send_create_signal('django_recurly', ['Subscription'])
 
@@ -51,7 +52,7 @@ class Migration(SchemaMigration):
             ('transaction_id', self.gf('django.db.models.fields.CharField')(max_length=40)),
             ('invoice_id', self.gf('django.db.models.fields.CharField')(max_length=40, null=True, blank=True)),
             ('action', self.gf('django.db.models.fields.CharField')(max_length=10)),
-            ('date', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
+            ('created_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('amount_in_cents', self.gf('django.db.models.fields.IntegerField')(null=True, blank=True)),
             ('status', self.gf('django.db.models.fields.CharField')(max_length=10)),
             ('message', self.gf('django.db.models.fields.CharField')(max_length=250)),
@@ -110,7 +111,6 @@ class Migration(SchemaMigration):
         'django_recurly.account': {
             'Meta': {'ordering': "['-id']", 'object_name': 'Account'},
             'account_code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '32'}),
-            'canceled': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'company_name': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
             'created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
             'email': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
@@ -119,6 +119,7 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'last_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'modified': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
+            'state': ('django.db.models.fields.CharField', [], {'default': "'active'", 'max_length': '20'}),
             'user': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'recurly_account'", 'null': 'True', 'on_delete': 'models.SET_NULL', 'to': "orm['auth.User']"})
         },
         'django_recurly.payment': {
@@ -126,7 +127,7 @@ class Migration(SchemaMigration):
             'account': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['django_recurly.Account']", 'null': 'True', 'blank': 'True'}),
             'action': ('django.db.models.fields.CharField', [], {'max_length': '10'}),
             'amount_in_cents': ('django.db.models.fields.IntegerField', [], {'null': 'True', 'blank': 'True'}),
-            'date': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'created_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'invoice_id': ('django.db.models.fields.CharField', [], {'max_length': '40', 'null': 'True', 'blank': 'True'}),
             'message': ('django.db.models.fields.CharField', [], {'max_length': '250'}),
@@ -138,6 +139,7 @@ class Migration(SchemaMigration):
             'account': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['django_recurly.Account']"}),
             'activated_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'canceled_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'currency': ('django.db.models.fields.CharField', [], {'default': "'USD'", 'max_length': '3'}),
             'current_period_ends_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'current_period_started_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'expires_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
@@ -146,10 +148,10 @@ class Migration(SchemaMigration):
             'plan_version': ('django.db.models.fields.IntegerField', [], {'default': '1'}),
             'quantity': ('django.db.models.fields.IntegerField', [], {'default': '1'}),
             'state': ('django.db.models.fields.CharField', [], {'default': "'active'", 'max_length': '20'}),
-            'super_subscription': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'total_amount_in_cents': ('django.db.models.fields.IntegerField', [], {'null': 'True', 'blank': 'True'}),
             'trial_ends_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
-            'trial_started_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'})
+            'trial_started_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'unit_amount_in_cents': ('django.db.models.fields.IntegerField', [], {'null': 'True', 'blank': 'True'}),
+            'uuid': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '40'})
         }
     }
 

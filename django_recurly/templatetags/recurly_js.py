@@ -5,7 +5,7 @@ from django.template import Library, Node, Variable, loader
 
 from django_recurly import recurly
 from django_recurly.models import Account
-from django_recurly.helpers.recurlyjs import get_config, get_subscription_form
+from django_recurly.helpers.recurlyjs import get_config, get_subscription_form, get_billing_info_update_form
 
 register = template.Library()
 
@@ -37,7 +37,24 @@ def subscription_form(context, plan_code):
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
 
-    return get_subscription_form(plan_code=plan_code, account=account)
+    return get_subscription_form(plan_code=plan_code, user=user, account=account)
+
+
+@register.simple_tag(takes_context=True)
+def billing_info_update_form(context):
+    user = context['user']
+    account = None
+
+    if user.is_authenticated():
+        try:
+            # TODO: Cache & Optimize
+            # Grab the recurly account details (could be different than user details)
+            account = recurly.Account().get(user.recurly_account.get().account_code)
+        except Account.DoesNotExist:
+            # Pre-populate the form fields with user data
+            account = recurly.Account(**user._wrapped.__dict__)
+
+    return get_billing_info_update_form(user=user, account=account)
 
 
 @register.simple_tag(takes_context=True)
@@ -48,6 +65,6 @@ def has_active_account(context):
         return False
 
     try:
-        bool(user.recurly_account.get().is_active())
+        user.recurly_account.get().is_active()
     except Account.DoesNotExist:
         return False

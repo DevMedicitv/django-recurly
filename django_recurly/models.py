@@ -15,23 +15,28 @@ import django_recurly.handlers
 import logging
 logger = logging.getLogger(__name__)
 
+ACCOUNT_STATES = (
+    ("active", "Active"),         # Active and everything is fine
+    ("closed", "Closed"),         # Account has been closed
+)
+
 SUBSCRIPTION_STATES = (
     ("active", "Active"),         # Active and everything is fine
     ("canceled", "Canceled"),     # Still active, but will not be renewed
-    ("expired", "Expired"),       # Did not renews, or was forcibly expired early
+    ("expired", "Expired"),       # Did not renew, or was forcibly expired
 )
 
 __all__ = ("Account", "Subscription", "User", "Payment")
 
 
-class CurrentAccountManager(models.Manager):
+class ActiveAccountManager(models.Manager):
     def get_query_set(self):
-        return super(CurrentAccountManager, self).get_query_set().filter(canceled=False)
+        return super(ActiveAccountManager, self).get_query_set().filter(state="active")
 
 
 class CurrentSubscriptionManager(models.Manager):
     def get_query_set(self):
-        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(super_subscription=True) | Q(state__in=("active", "canceled")))
+        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(state__in=("active", "canceled")))  # But not 'expired'
 
 
 class Account(TimeStampedModel):
@@ -41,11 +46,11 @@ class Account(TimeStampedModel):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     company_name = models.CharField(max_length=100, blank=True, null=True)
-    canceled = models.BooleanField(default=False)
+    state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
 
     objects = models.Manager()
-    current = CurrentAccountManager()
+    active = ActiveAccountManager()
 
     class Meta:
         ordering = ["-id"]
@@ -62,9 +67,12 @@ class Account(TimeStampedModel):
         """
         return self.subscription_set.all()
 
-    def get_current_subscriptions(self):
+    def get_current_subscriptions(self, plan_code=None):
         try:
-            return Subscription.current.filter(account=self)
+            if plan_code is not None:
+                return Subscription.current.filter(account=self, plan_code=plan_code)
+            else:
+                return Subscription.current.filter(account=self)
         except Subscription.DoesNotExist:
             return None
 
@@ -78,86 +86,61 @@ class Account(TimeStampedModel):
         response = recurly.accounts.transactions(account_code=self.account_code)
         return response["transaction"]
 
-    def fetch_hosted_login_token(self):
-        raise NotImplemented("Well, it's not. Sorry.")
+    def is_active(self):
+        return self.state == 'active'
 
     @classmethod
-    def get_current(class_, user):
-        return class_.current.filter(user=user).latest()
+    def get_active(class_, user):
+        return class_.active.filter(user=user).latest()
 
     @classmethod
     def handle_notification(class_, **kwargs):
-        """Update/create an account and it's associated subscription using data from Recurly"""
-        # First get/create the account
+        """Update/create an account and its associated subscription using data from Recurly"""
+
+        # First get the up-to-date account details directly from Recurly and
+        # convert it to a model instance, which will load an existing account
+        # for update (if one exists)
         recurly_account = recurly.Account().get(kwargs.get("account").account_code)
         account = modelify(recurly_account, class_)
 
         try:
+            # Associate the account with the user who created it
             account.user = User.objects.get(username=recurly_account.username)
         except User.DoesNotExist:
-            # It's possible that a user may not exist locally (e.g. deleted auth.models.User)
+            # It's possible that a user may not exist locally (closed account)
             account.user = None
+
+        was_active = bool(class_.active.filter(pk=account.pk).count())
+        now_active = account.is_active()
 
         account.save()
 
-        # Now get/create the subscription
+        # Now do the same with the subscription (if there is one)
         if not kwargs.get("subscription"):
-            return account, None
+            subscription = None
+        else:
+            recurly_subscription = recurly.Subscription().get(kwargs.get("subscription").uuid)
+            subscription = modelify(recurly_subscription, Subscription)
 
-        recurly_subscription = recurly.Subscription().get(kwargs.get("subscription").uuid)
-        subscription = modelify(recurly_subscription, Subscription)
+            if subscription.pk is None:
+                was_current = False
+            else:
+                was_current = bool(Subscription.current.filter(pk=subscription.pk).count())
+            now_current = subscription.state != 'expired'
 
-        subscription.save()
+            subscription.save()
 
-        # if not subscription:
-        #     # Not found, create it
-        #     # subscription = Subscription.objects.create(account=account, **subscription_data)
-        #     subscription = Subscription.objects.create(**subscription_data)
+            # Send account closed/opened signals
+            if was_current and not now_current:
+                signals.subscription_expired.send(sender=account, account=account, subscription=subscription)
+            elif not was_current and now_current:
+                signals.subscription_current.send(sender=account, account=account, subscription=subscription)
 
-        #     was_current = False
-        #     now_current = subscription.is_current()
-        # else:
-        #     was_current = subscription.is_current()
-
-        #     # Found, update it
-        #     for k, v in subscription_data.items():
-        #         setattr(subscription, k, v)
-        #     subscription.save()
-
-        #     now_current = subscription.is_current()
-
-        # # Send account closed/opened signals
-        # if was_current and not now_current:
-        #     signals.account_closed.send(sender=account, account=account, subscription=subscription)
-        # elif not was_current and now_current:
-        #     signals.account_opened.send(sender=account, account=account, subscription=subscription)
-
-        return account, subscription
-
-    @classmethod
-    def create_fake(class_, user, plan_code):
-        """Create a fake account for a user
-
-        Creates an account which exists in Django, but not in Recurly. This can be
-        handy for testing, or the occasional time when you just want to give someone
-        a paid subscription without any fuss.
-        """
-
-        account = class_.objects.create(
-            account_code="fake_%s" % random_string(32 - 5),
-            user=user,
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            canceled=False
-        )
-
-        subscription = Subscription.objects.create(
-            account=account,
-            plan_code=plan_code
-        )
-
-        signals.account_opened.send(sender=account, account=account, subscription=subscription)
+        # Send account closed/opened signals
+        if was_active and not now_active:
+            signals.account_closed.send(sender=account, account=account, subscription=subscription)
+        elif not was_active and now_active:
+            signals.account_opened.send(sender=account, account=account, subscription=subscription)
 
         return account, subscription
 
@@ -170,6 +153,7 @@ class Subscription(models.Model):
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
     unit_amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
+    currency = models.CharField(max_length=3, default="USD")
     activated_at = models.DateTimeField(blank=True, null=True)
     canceled_at = models.DateTimeField(blank=True, null=True)
     expires_at = models.DateTimeField(blank=True, null=True)
@@ -177,8 +161,6 @@ class Subscription(models.Model):
     current_period_ends_at = models.DateTimeField(blank=True, null=True)
     trial_started_at = models.DateTimeField(blank=True, null=True)
     trial_ends_at = models.DateTimeField(blank=True, null=True)
-
-    super_subscription = models.BooleanField(default=False)
 
     objects = models.Manager()
     current = CurrentSubscriptionManager()
@@ -188,20 +170,17 @@ class Subscription(models.Model):
         get_latest_by = "id"
 
     def is_current(self):
-        """Is this subscription current (i.e. not expired and good to be used)
+        """Is this subscription current (i.e. not 'expired')
 
-        Note that 'canceled' accounts are actually still 'current', as
-        'canceled' just indicates they they will not renew after the
-        current billing period (at which point Recurly will tell us that
+        Note that 'canceled' subscriptions are actually still considered
+        current, as 'canceled' just indicates they they will not renew after
+        the current billing period (at which point Recurly will tell us that
         they are 'expired')
         """
 
-        return bool(Subscription.current.filter(pk=self.pk).count())
+        return self.state != 'expired'
 
     def is_trial(self):
-        if self.super_subscription:
-            return False
-
         if not self.trial_started_at or not self.trial_ends_at:
             return False # No trial dates, so not a trial
 

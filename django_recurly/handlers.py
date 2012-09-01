@@ -27,6 +27,7 @@ def payment(sender, **kwargs):
     from django_recurly import models
     models.Payment.handle_notification(**kwargs)
 
+#signals.new_account_notification.connect(new)
 signals.new_subscription_notification.connect(new)
 signals.updated_subscription_notification.connect(update)
 signals.expired_subscription_notification.connect(update)

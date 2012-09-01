@@ -1,5 +1,3 @@
 {% autoescape off %}
-Recurly.buildSubscriptionForm(
-  {{ json }}
-);
+Recurly.buildSubscriptionForm({{ json }});
 {% endautoescape %}

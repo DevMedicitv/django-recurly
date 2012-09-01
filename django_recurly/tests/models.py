@@ -160,11 +160,6 @@ class SubscriptionModelTest(BaseTest):
 
         self.assertFalse(Subscription.objects.latest().is_current())
 
-        subscription.super_subscription = True
-        subscription.save()
-
-        self.assertTrue(Subscription.objects.latest().is_current())
-
     def test_is_trial(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         account, subscription = Account.handle_notification(data)

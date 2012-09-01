@@ -4,11 +4,17 @@ from django.dispatch import Signal
 
 ## General use signals ##
 
-# Fired when a user gains a valid (i.e. current) account
+# Fired when a user gains a valid (i.e. 'active') account
 account_opened = Signal(providing_args=('account','subscription'))
 
-# Fired when a user's valid (i.e. current) account stops being valid (i.e. is 'expired')
+# Fired when a user's active account is closed
 account_closed = Signal(providing_args=('account','subscription'))
+
+# Fired when a user gains a valid (i.e. not 'expired') subscription
+subscription_current = Signal(providing_args=('account','subscription'))
+
+# Fired when a user's subscription expires
+subscription_expired = Signal(providing_args=('account','subscription'))
 
 ## Notifications from recurly ##
 
