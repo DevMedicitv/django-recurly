@@ -4,10 +4,8 @@ from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
 from datetime import datetime
 
-from django_recurly.utils import random_string
 from django_recurly import recurly, signals
-
-import json
+from django_recurly.utils import dump
 
 # Do these here to ensure the handlers get hooked up
 import django_recurly.handlers
@@ -56,18 +54,16 @@ class Account(TimeStampedModel):
         ordering = ["-id"]
         get_latest_by = "id"
 
-    def get_subscriptions(self):
-        """Get all subscriptions for this Account
-
-        An account may have multiple subscriptions in cases
-        where old subscriptions expired.
-
-        If you need the active subscriptions, consider
-        using get_current_subscriptions()
+    def get_all_subscriptions(self):
+        """Get all subscriptions for this Account, including active and expired.
         """
         return self.subscription_set.all()
 
-    def get_current_subscriptions(self, plan_code=None):
+    def get_subscriptions(self, plan_code=None):
+        """Get all current subscriptions for this Account
+
+        An account may have multiple subscriptions of the same `plan_code`.
+        """
         try:
             if plan_code is not None:
                 return Subscription.current.filter(account=self, plan_code=plan_code)
@@ -76,18 +72,25 @@ class Account(TimeStampedModel):
         except Subscription.DoesNotExist:
             return None
 
-    def get_latest_subscription(self):
-        try:
-            return Subscription.current.filter(account=self).latest()
-        except Subscription.DoesNotExist:
-            return None
+    def get_subscription(self, plan_code=None):
+        """Get current subscription of type `plan_code` for this Account.
 
-    def get_transactions(self):
-        response = recurly.accounts.transactions(account_code=self.account_code)
-        return response["transaction"]
+        An exception will be raised if the account has more than one
+        subscription of this type.
+        """
+        if plan_code is not None:
+            return Subscription.current.get(account=self, plan_code=plan_code)
+        else:
+            return Subscription.current.get(account=self)
 
     def is_active(self):
         return self.state == 'active'
+
+    def get_invoices(self):
+        return recurly.Account.get(self.account_code).invoices
+
+    def get_transactions(self):
+        return recurly.Account.get(self.account_code).transactions
 
     @classmethod
     def get_active(class_, user):
@@ -100,7 +103,7 @@ class Account(TimeStampedModel):
         # First get the up-to-date account details directly from Recurly and
         # convert it to a model instance, which will load an existing account
         # for update (if one exists)
-        recurly_account = recurly.Account().get(kwargs.get("account").account_code)
+        recurly_account = recurly.Account.get(kwargs.get("account").account_code)
         account = modelify(recurly_account, class_)
 
         try:
@@ -119,8 +122,9 @@ class Account(TimeStampedModel):
         if not kwargs.get("subscription"):
             subscription = None
         else:
-            recurly_subscription = recurly.Subscription().get(kwargs.get("subscription").uuid)
+            recurly_subscription = recurly.Subscription.get(kwargs.get("subscription").uuid)
             subscription = modelify(recurly_subscription, Subscription)
+            subscription.xml = kwargs.get('xml')
 
             if subscription.pk is None:
                 was_current = False
@@ -130,11 +134,15 @@ class Account(TimeStampedModel):
 
             subscription.save()
 
+            signals.subscription_updated.send(sender=account, account=account, subscription=subscription)
+
             # Send account closed/opened signals
             if was_current and not now_current:
                 signals.subscription_expired.send(sender=account, account=account, subscription=subscription)
             elif not was_current and now_current:
                 signals.subscription_current.send(sender=account, account=account, subscription=subscription)
+
+        signals.account_updated.send(sender=account, account=account, subscription=subscription)
 
         # Send account closed/opened signals
         if was_active and not now_active:
@@ -161,6 +169,7 @@ class Subscription(models.Model):
     current_period_ends_at = models.DateTimeField(blank=True, null=True)
     trial_started_at = models.DateTimeField(blank=True, null=True)
     trial_ends_at = models.DateTimeField(blank=True, null=True)
+    xml = models.TextField(blank=True, null=True)
 
     objects = models.Manager()
     current = CurrentSubscriptionManager()
@@ -190,6 +199,17 @@ class Subscription(models.Model):
         else:
             return False
 
+    def get_pending_changes(self):
+        try:
+            return recurly.objects_for_push_notification(self.xml).subscription.pending_subscription
+        except Exception:
+            logger.debug("Failed to get pending changes")
+            logger.debug(dump(recurly.objects_for_push_notification(self.xml)))
+            return None
+
+    def get_plan(self):
+        return recurly.Plan.get(self.plan_code)
+
     def change_plan(self, plan_code, timeframe='now'):
         """Change this subscription to the specified plan_code.
 
@@ -202,16 +222,16 @@ class Subscription(models.Model):
                          the pending updates to provision
         """
 
-        update_data = {
-            "timeframe": timeframe,
-            "plan_code": plan_code
-        }
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription.plan_code = plan_code
+        recurly_subscription.timeframe = timeframe
+        recurly_subscription.save()
 
-        recurly.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
-        self.plan_code = plan_code
-        self.save()
+        # Push notifications will signal an update
+        # self.plan_code = plan_code
+        # self.save()
 
-    def change_quantity(self, quantity=1, incremental=False):
+    def change_quantity(self, quantity=1, incremental=False, timeframe='now'):
         """Change this subscription quantity. The quantity will be changed to
         `quantity` if `incremental` is `False`, and increment the quantity by
         `quantity` if `incremental` is `True`.
@@ -219,14 +239,28 @@ class Subscription(models.Model):
         This will call the Recurly API and update the subscription.
         """
 
-        update_data = {
-            "timeframe": timeframe,
-            "quantity": quantity if not incremental else self.quantity + quantity
-        }
+        new_quantity = quantity if not incremental else (self.quantity + quantity)
 
-        recurly.accounts.subscription.update(account_code=self.account.account_code, data=update_data)
-        self.quantity = update_data['quantity']
-        self.save()
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription.quantity = new_quantity
+        recurly_subscription.timeframe = timeframe
+        recurly_subscription.save()
+
+        # Push notifications will signal an update
+        # self.quantity = new_quantity
+        # self.save()
+
+    def cancel(self):
+        """Cancel the subscription, it will expire at the end of the current billing cycle"""
+
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription.cancel()
+
+    def reactivate(self):
+        """Reactivate the cancelled subscription so it renews at the end of the current billing cycle"""
+
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription.reactivate()
 
     def terminate(self, refund="none"):
         """Terminate the subscription
@@ -237,14 +271,13 @@ class Subscription(models.Model):
             - "full" : Provide a full refund of the most recent charge
         """
 
-        recurly.accounts.subscription.delete(account_code=self.account.account_code, refund=refund)
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription.terminate(refund=refund)
 
-    def cancel(self):
-        """Cancel the subscription, it will expire at the end of the current billing cycle"""
+    @classmethod
+    def get_plans():
+        return [plan.name for plan in recurly.Plan.all()]
 
-        recurly.accounts.subscription.delete(account_code=self.account.account_code)
-
-# TODO: Make this map more closely with Recurly, or remove it. Why store this stuff?
 class Payment(models.Model):
 
     ACTION_CHOICES = (
@@ -266,10 +299,17 @@ class Payment(models.Model):
     amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     message = models.CharField(max_length=250)
+    xml = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ["-id"]
         get_latest_by = "id"
+
+    def get_transaction(self):
+        return recurly.Transaction.get(self.transaction_id)
+
+    def get_invoice(self):
+        return recurly.Invoice.get(self.invoice_id)
 
     @classmethod
     def handle_notification(class_, **kwargs):
@@ -277,12 +317,19 @@ class Payment(models.Model):
         recurly_account = recurly.Account().get(kwargs.get("account").account_code)
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
+        new_payment = bool(payment.pk is None)
 
         payment.transaction_id = recurly_transaction.uuid
         payment.invoice_id = recurly_transaction.invoice().uuid
         payment.account = modelify(recurly_account, Account)
+        payment.xml = kwargs.get('xml')
 
         payment.save()
+
+        if new_payment:
+            signals.payment_created.send(sender=payment, payment=payment, account=payment.account)
+        else:
+            signals.payment_updated.send(sender=payment, payment=payment, account=payment.account)
 
         return payment
 

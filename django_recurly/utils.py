@@ -24,9 +24,13 @@ class RecurlyJsonEncoder(json.JSONEncoder):
 
         # Resolve 'relatiator' attributes
         if callable(obj):
-            return obj().to_dict()
+            result = obj()
+            if hasattr(result, 'to_dict'):
+                return result.to_dict()
+            else:
+                return result
 
-        if isinstance(obj, recurly.SubscriptionAddOn):
+        if isinstance(obj, recurly.Resource):
             return obj.to_dict()
 
         try:

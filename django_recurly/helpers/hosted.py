@@ -1,9 +1,6 @@
 """Helpers for working with Recurly's Hosted Payment Pages"""
 
-import urllib
-
 from django_recurly.conf import SUBDOMAIN
-from django.core.urlresolvers import reverse
 from django.utils.http import urlquote_plus
 from django.utils.encoding import iri_to_uri
 from django.http import HttpResponseRedirect

@@ -1,16 +1,15 @@
-import base64
-
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from django.utils.crypto import constant_time_compare
+from django.contrib.auth.decorators import login_required
 
 import logging
 
 from .decorators import recurly_basic_authentication
-from . import recurly, signals
+from .utils import dump, safe_redirect
+from . import recurly, models, signals
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def push_notifications(request):
     objects = recurly.objects_for_push_notification(xml.strip())
 
     logger.debug("Notification objects: ")
-    logger.debug(objects)
+    logger.debug(dump(objects))
 
     try:
         signal = getattr(signals, objects['type'])
@@ -36,25 +35,28 @@ def push_notifications(request):
     signal.send(sender=recurly, xml=xml, **objects)
     return HttpResponse()
 
+@login_required
 @require_POST
 def change_plan(request):
+    old_plan = request.POST.get("ref_plan_code")
     new_plan = request.POST.get("plan_code")
 
-    subscription = Account.get_current(request.user).get_current_subscription()
+    subscription = models.Account.get_current(request.user).get_subscription(plan_code=old_plan)
     subscription.change_plan(new_plan)
 
     redirect_to = request.POST.get("redirect_to", None)
 
     return safe_redirect(redirect_to)
 
+@login_required
 def account(request):
-    account = Account.get_current(request.user)
-    subscription = account.get_current_subscription()
-    plans = [plan.name for plan in recurly.Plan().all()]
+    account = models.Account.get_current(request.user)
+    subscriptions = account.get_current_subscriptions()
+    plans = models.Subscription.getPlans()
 
     c = {
         "account": account,
-        "subscription": subscription,
+        "subscriptions": subscriptions,
         "plans": plans
     }
 

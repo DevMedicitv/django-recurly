@@ -2,7 +2,6 @@
 from django.template.loader import render_to_string
 
 from django_recurly.conf import SUBDOMAIN, DEFAULT_CURRENCY
-from django_recurly.models import Account, Subscription
 from django_recurly.utils import dump, to_camel
 from django_recurly import recurly
 
@@ -18,12 +17,13 @@ def get_config(subdomain=SUBDOMAIN, currency=DEFAULT_CURRENCY):
     })
 
 
-def get_subscription_form(plan_code, user, account=None, target_element='#recurly-container', success_handler=None):
+def get_subscription_form(plan_code, user, quantity=1, account=None, target_element='#recurly-container', success_handler=None):
     # Protected params
     data = {
         'plan_code': plan_code,
         'subscription': {
             'plan_code': plan_code,
+            'quantity': quantity,
         },
         'account': {
             'username': user.username,

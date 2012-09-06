@@ -1,5 +1,6 @@
 <form action="{% url change_plan %}" method="POST">
     {% csrf_token %}
+    <input type="hidden" name="subscription_id" value="{{ subscription_id }}">
     <input type="hidden" name="plan_code" value="{{ plan_code }}">
     <input type="submit" name="submit" value="Change plan">
 </form>

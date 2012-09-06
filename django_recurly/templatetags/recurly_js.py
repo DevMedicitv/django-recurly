@@ -24,7 +24,7 @@ def recurly_config():
 
 
 @register.simple_tag(takes_context=True)
-def subscription_form(context, plan_code):
+def subscription_form(context, plan_code, quantity=1):
     user = context['user']
     account = None
 
@@ -37,7 +37,7 @@ def subscription_form(context, plan_code):
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
 
-    return get_subscription_form(plan_code=plan_code, user=user, account=account)
+    return get_subscription_form(plan_code=plan_code, quantity=quantity, user=user, account=account)
 
 
 @register.simple_tag(takes_context=True)

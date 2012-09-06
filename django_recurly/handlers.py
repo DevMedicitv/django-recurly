@@ -9,6 +9,8 @@ http://docs.recurly.com/push-notifications
 
 from django_recurly import signals
 
+# Signal handlers
+
 def new(sender, **kwargs):
     """Create the account and the subscription
 
@@ -26,6 +28,8 @@ def update(sender, **kwargs):
 def payment(sender, **kwargs):
     from django_recurly import models
     models.Payment.handle_notification(**kwargs)
+
+# Connect
 
 #signals.new_account_notification.connect(new)
 signals.new_subscription_notification.connect(new)

@@ -3,7 +3,7 @@ import sys
 from django.core.management.base import BaseCommand
 from optparse import make_option
 
-from django_recurly.util import dump
+from django_recurly.utils import dump
 from django_recurly import recurly
 
 class Command(BaseCommand):
@@ -42,27 +42,27 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
 
         if options['account']:
-            account = recurly.Account().get(options['account'])
+            account = recurly.Account.get(options['account'])
             print(dump(account))
 
         elif options['accounts']:
-            for account in recurly.Account().all_active():
+            for account in recurly.Account.all_active():
                 print(dump(account))
 
         elif options['plan']:
-            plan = recurly.Plan().get(options['plan'])
+            plan = recurly.Plan.get(options['plan'])
             print(dump(plan))
 
         elif options['plans']:
-            for plan in recurly.Plan().all():
+            for plan in recurly.Plan.all():
                 print(dump(plan))
 
         elif options['subscription']:
-            subscription = recurly.Subscription().get(options['subscription'])
+            subscription = recurly.Subscription.get(options['subscription'])
             print(dump(subscription))
 
         elif options['subscriptions']:
-            for subscription in recurly.Subscription().all():
+            for subscription in recurly.Subscription.all():
                 print(dump(subscription))
 
         else:
