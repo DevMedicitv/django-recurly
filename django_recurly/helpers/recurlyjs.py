@@ -38,12 +38,12 @@ def get_subscription_form(plan_code, user, quantity=1, account=None, target_elem
     data['target'] = target_element
 
     if account is not None:
-        data['account'] = account.to_dict()
+        data['account'] = account
 
     if success_handler is not None:
         data['success_handler'] = success_handler
 
-    data['json'] = dump(to_camel(data))
+    data['json'] = dump(data, js=True)
 
     return render_to_string("django_recurly/build_subscription_form.js", data)
 
@@ -63,12 +63,12 @@ def get_billing_info_update_form(user, account, target_element='#recurly-contain
 
     # Unprotected params
     data['target'] = target_element
-    data['account'] = account.to_dict()
-    data['billing_info'] = account.billing_info.to_dict()
+    data['account'] = account
+    data['billing_info'] = account.billing_info
 
     if success_handler is not None:
         data['success_handler'] = success_handler
 
-    data['json'] = dump(to_camel(data))
+    data['json'] = dump(data, js=True)
 
     return render_to_string("django_recurly/build_billing_info_update_form.js", data)

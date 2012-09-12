@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
-from datetime import datetime
+from django.utils import timezone
 
 from django_recurly import recurly, signals
 from django_recurly.utils import dump
@@ -193,7 +193,7 @@ class Subscription(models.Model):
         if not self.trial_started_at or not self.trial_ends_at:
             return False # No trial dates, so not a trial
 
-        now = datetime.now()
+        now = timezone.now()
         if self.trial_started_at <= now and self.trial_ends_at > now:
             return True
         else:
@@ -214,24 +214,15 @@ class Subscription(models.Model):
         """Change this subscription to the specified plan_code.
 
         This will call the Recurly API and update the subscription.
-
-        `timeframe` may be one of:
-            - 'now' : A prorated charge or credit is calculated and the
-                      subscription is updated immediately.
-            - 'renewal': Invoicing is delayed until next billing cycle. Use
-                         the pending updates to provision
         """
 
-        recurly_subscription = recurly.Subscription.get(self.uuid)
-        recurly_subscription.plan_code = plan_code
-        recurly_subscription.timeframe = timeframe
-        recurly_subscription.save()
+        self.change(timeframe, plan_code=plan_code)
 
         # Push notifications will signal an update
         # self.plan_code = plan_code
         # self.save()
 
-    def change_quantity(self, quantity=1, incremental=False, timeframe='now'):
+    def change_quantity(self, quantity, incremental=False, timeframe='now'):
         """Change this subscription quantity. The quantity will be changed to
         `quantity` if `incremental` is `False`, and increment the quantity by
         `quantity` if `incremental` is `True`.
@@ -241,14 +232,37 @@ class Subscription(models.Model):
 
         new_quantity = quantity if not incremental else (self.quantity + quantity)
 
-        recurly_subscription = recurly.Subscription.get(self.uuid)
-        recurly_subscription.quantity = new_quantity
-        recurly_subscription.timeframe = timeframe
-        recurly_subscription.save()
+        self.change(timeframe, quantity=new_quantity)
 
         # Push notifications will signal an update
         # self.quantity = new_quantity
         # self.save()
+
+    def change(self, timeframe='now', **kwargs):
+        """Change this subscription to the values supplied in the arguments
+
+        `timeframe` may be one of:
+            - 'now' : A prorated charge or credit is calculated and the
+                      subscription is updated immediately.
+            - 'renewal': Invoicing is delayed until next billing cycle. Use
+                         the pending updates to provision
+
+        `plan_code`
+        `quantity`
+        `unit_amount_in_cents`
+
+        This will call the Recurly API and update the subscription.
+        """
+
+        recurly_subscription = recurly.Subscription.get(self.uuid)
+
+
+        for k, v in kwargs:
+            setattr(recurly_subscription, k, v)
+        recurly_subscription.timeframe = timeframe
+
+        recurly_subscription.save()
+
 
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current billing cycle"""
@@ -342,10 +356,12 @@ MODEL_MAP = {
     'transaction': Payment,
 }
 
-def modelify(resource, model, remove_empty=False):
+def modelify(resource, model, remove_empty=False, context={}):
     fields = set(field.name for field in model._meta.fields)
     fields_by_name = dict((field.name, field) for field in model._meta.fields)
     fields.discard("id")
+
+    logger.debug("Modelify: %s" % resource)
 
     data = resource
     try:
@@ -357,7 +373,14 @@ def modelify(resource, model, remove_empty=False):
     for k, v in data.items():
         # Recursively replace known keys with actual models
         if k in MODEL_MAP:
-            logger.debug("Modelifying a '%s'" % k)
+            logger.debug("Modelifying a nested '%s'" % k)
+
+            if isinstance(v, basestring):
+                try:
+                    v = resource.link(k)
+                except AttributeError:
+                    pass
+
             if callable(v):
                 v = v()
 

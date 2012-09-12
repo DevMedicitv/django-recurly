@@ -46,7 +46,7 @@ def change_plan(request):
 
     redirect_to = request.POST.get("redirect_to", None)
 
-    return safe_redirect(redirect_to)
+    return safe_redirect(request, redirect_to)
 
 @login_required
 def account(request):

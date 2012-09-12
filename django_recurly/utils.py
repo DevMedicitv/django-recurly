@@ -16,8 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class RecurlyJsonEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def __init__(self, js=False, *args, **kwargs):
+        super(RecurlyJsonEncoder, self).__init__(*args, **kwargs)
+        self.js = js
 
+    def default(self, obj):
         if isinstance(obj, datetime) or \
                 isinstance(obj, recurly.resource.Money):
             return str(obj)
@@ -25,13 +28,15 @@ class RecurlyJsonEncoder(json.JSONEncoder):
         # Resolve 'relatiator' attributes
         if callable(obj):
             result = obj()
-            if hasattr(result, 'to_dict'):
-                return result.to_dict()
-            else:
+            try:
+                logger.debug(self.js)
+                return result.to_dict(js=self.js)
+            except:
                 return result
 
         if isinstance(obj, recurly.Resource):
-            return obj.to_dict()
+            logger.debug(self.js)
+            return obj.to_dict(js=self.js)
 
         try:
             if issubclass(obj, dict) or issubclass(obj, list):
@@ -45,23 +50,19 @@ class RecurlyJsonEncoder(json.JSONEncoder):
 def dump(obj, encoder=RecurlyJsonEncoder, js=False):
     data = obj
     try:
-        data = data.to_dict()
+        data = data.to_dict(js=js)
     except AttributeError:
         pass
 
-    if js:
-        return json.dumps(
-            data,
-            sort_keys=True,
-            indent=2,
-            cls=encoder,
-            separators=(', ', ': '))
-    else:
-        return json.dumps(
-            data,
-            sort_keys=True,
-            indent=2,
-            cls=encoder)
+    data = to_camel(data, js=js)
+    logger.debug(data)
+
+    return json.dumps(
+        data,
+        sort_keys=True,
+        indent=2,
+        cls=encoder,
+        js=js)
 
 
 
@@ -84,7 +85,7 @@ def hosted_payment_page_url(plan_code, account_code, data=None):
     )
 
 
-def safe_redirect(url, fallback="/"):
+def safe_redirect(request, url, fallback="/"):
     netloc = urlparse.urlparse(url or "")[1]
 
     if not url:
@@ -102,11 +103,16 @@ def random_string(length=32):
     return ''.join(random.choice(string.letters + string.digits) for i in xrange(length))
 
 
-def to_camel(data):
+def to_camel(data, js=False):
     def underscore_to_camel(match):
         return match.group()[0] + match.group()[2].upper()
 
     def camelize(data):
+        try:
+            data = data.to_dict(js=js)
+        except:
+            data = data
+
         if type(data) == type({}):
             new_dict = {}
             for key, value in data.items():
