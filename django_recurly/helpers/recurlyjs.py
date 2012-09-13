@@ -17,38 +17,34 @@ def get_config(subdomain=SUBDOMAIN, currency=DEFAULT_CURRENCY):
     })
 
 
-def get_subscription_form(plan_code, user, quantity=1, account=None, target_element='#recurly-container', success_handler=None):
+def get_subscription_form(plan_code, user, target_element='#recurly-container', protected_params={}, unprotected_params={}):
+    from django_recurly.utils import dict_merge
+
     # Protected params
     data = {
         'plan_code': plan_code,
         'subscription': {
             'plan_code': plan_code,
-            'quantity': quantity,
         },
         'account': {
             'username': user.username,
         },
-        'addressRequirement': 'none',
-        'enableCoupons': False,
     }
-
+    dict_merge(data, protected_params)
     data['signature'] = get_signature(data)
 
     # Unprotected params
     data['target'] = target_element
-
-    if account is not None:
-        data['account'] = account
-
-    if success_handler is not None:
-        data['success_handler'] = success_handler
+    dict_merge(data, unprotected_params)
 
     data['json'] = dump(data, js=True)
 
     return render_to_string("django_recurly/build_subscription_form.js", data)
 
 
-def get_billing_info_update_form(user, account, target_element='#recurly-container', success_handler=None):
+def get_billing_info_update_form(user, account, target_element='#recurly-container', protected_params={}, unprotected_params={}):
+    from django_recurly.utils import dict_merge
+
     # Protected params
     data = {
         'account_code': account.account_code,
@@ -58,16 +54,12 @@ def get_billing_info_update_form(user, account, target_element='#recurly-contain
         },
         'addressRequirement': 'none',
     }
-
+    dict_merge(data, protected_params)
     data['signature'] = get_signature(data)
 
     # Unprotected params
     data['target'] = target_element
-    data['account'] = account
-    data['billing_info'] = account.billing_info
-
-    if success_handler is not None:
-        data['success_handler'] = success_handler
+    dict_merge(data, {'account': account.to_dict(js=True), 'billing_info': account.billing_info.to_dict(js=True)}, unprotected_params)
 
     data['json'] = dump(data, js=True)
 

@@ -6,6 +6,7 @@ import iso8601
 import json
 import re
 from datetime import datetime
+from copy import deepcopy
 
 from django.shortcuts import redirect
 from django_recurly.conf import SUBDOMAIN
@@ -103,6 +104,31 @@ def random_string(length=32):
     return ''.join(random.choice(string.letters + string.digits) for i in xrange(length))
 
 
+def dict_merge(target, *args):
+    '''Recursively merge one or more dict's into `target` and return the result.
+    Righter args will override existing non-dict values if already set. If you
+    don't want to modify an existing object, pass an empty dict as the first
+    argument and store the returned value. This is similar to
+    [jQuery.extend()](http://api.jquery.com/jQuery.extend/).'''
+
+    # Merge multiple dicts
+    if len(args) > 1:
+        for obj in args:
+            dict_merge(target, obj)
+        return target
+
+    # Recursively merge dict values and set or override non-dict values
+    obj = args[0]
+    if not isinstance(obj, dict):
+        return obj
+    for k, v in obj.iteritems():
+        if k in target and isinstance(target[k], dict):
+            dict_merge(target[k], v)
+        else:
+            target[k] = deepcopy(v)
+    return target
+
+
 def to_camel(data, js=False):
     def underscore_to_camel(match):
         return match.group()[0] + match.group()[2].upper()
@@ -126,6 +152,7 @@ def to_camel(data, js=False):
         return data
 
     return camelize(data)
+
 
 def from_camel(content):
     # Changes camelCase json names to object containing underscore_separated names

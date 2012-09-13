@@ -24,35 +24,49 @@ def recurly_config():
 
 
 @register.simple_tag(takes_context=True)
-def subscription_form(context, plan_code, quantity=1):
+def subscription_form(context, plan_code, target_element="#recurly-container", protected_params={}, unprotected_params={}):
+    from django_recurly.utils import dict_merge
+
     user = context['user']
     account = None
 
     if user.is_authenticated():
         try:
-            # TODO: Cache & Optimize
-            # Grab the recurly account details (could be different than user details)
-            account = recurly.Account().get(user.recurly_account.get().account_code)
+            # Grab the recurly account details (could be different from app user details)
+            account = user.recurly_account.get().get_account()
         except Account.DoesNotExist:
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
 
-    return get_subscription_form(plan_code=plan_code, quantity=quantity, user=user, account=account)
+        #TODO: Simplify
+        if 'account' in unprotected_params:
+            unprotected_params["account"] = dict_merge(account.to_dict(js=True), unprotected_params["account"])
+        else:
+            unprotected_params["account"] = account.to_dict(js=True)
+
+    return get_subscription_form(plan_code=plan_code, user=user, protected_params=protected_params, unprotected_params=unprotected_params)
 
 
 @register.simple_tag(takes_context=True)
-def billing_info_update_form(context):
+def billing_info_update_form(context, target_element="#recurly-container", protected_params={}, unprotected_params={}):
+    from django_recurly.utils import dict_merge
+
     user = context['user']
     account = None
 
     if user.is_authenticated():
         try:
-            # TODO: Cache & Optimize
-            # Grab the recurly account details (could be different than user details)
-            account = recurly.Account().get(user.recurly_account.get().account_code)
+            # Grab the recurly account details (could be different from app user details)
+            account = user.recurly_account.get().get_account()
         except Account.DoesNotExist:
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
+
+        #TODO: Simplify
+        if 'account' in unprotected_params:
+            unprotected_params["account"] = dict_merge(account.to_dict(js=True), unprotected_params["account"])
+        else:
+            unprotected_params["account"] = account.to_dict(js=True)
 
     return get_billing_info_update_form(user=user, account=account)
 

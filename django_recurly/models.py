@@ -86,11 +86,15 @@ class Account(TimeStampedModel):
     def is_active(self):
         return self.state == 'active'
 
+    def get_account(self):
+        # TODO: Cache/store account object
+        return recurly.Account.get(self.account_code)
+
     def get_invoices(self):
-        return recurly.Account.get(self.account_code).invoices
+        return self.get_recurly_account().invoices
 
     def get_transactions(self):
-        return recurly.Account.get(self.account_code).transactions
+        return self.get_recurly_account().transactions
 
     @classmethod
     def get_active(class_, user):
@@ -186,7 +190,6 @@ class Subscription(models.Model):
         the current billing period (at which point Recurly will tell us that
         they are 'expired')
         """
-
         return self.state != 'expired'
 
     def is_trial(self):
@@ -215,12 +218,7 @@ class Subscription(models.Model):
 
         This will call the Recurly API and update the subscription.
         """
-
         self.change(timeframe, plan_code=plan_code)
-
-        # Push notifications will signal an update
-        # self.plan_code = plan_code
-        # self.save()
 
     def change_quantity(self, quantity, incremental=False, timeframe='now'):
         """Change this subscription quantity. The quantity will be changed to
@@ -233,10 +231,6 @@ class Subscription(models.Model):
         new_quantity = quantity if not incremental else (self.quantity + quantity)
 
         self.change(timeframe, quantity=new_quantity)
-
-        # Push notifications will signal an update
-        # self.quantity = new_quantity
-        # self.save()
 
     def change(self, timeframe='now', **kwargs):
         """Change this subscription to the values supplied in the arguments
@@ -253,9 +247,7 @@ class Subscription(models.Model):
 
         This will call the Recurly API and update the subscription.
         """
-
         recurly_subscription = recurly.Subscription.get(self.uuid)
-
 
         for k, v in kwargs:
             setattr(recurly_subscription, k, v)
@@ -263,16 +255,13 @@ class Subscription(models.Model):
 
         recurly_subscription.save()
 
-
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current billing cycle"""
-
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.cancel()
 
     def reactivate(self):
         """Reactivate the cancelled subscription so it renews at the end of the current billing cycle"""
-
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.reactivate()
 
@@ -284,7 +273,6 @@ class Subscription(models.Model):
             - "partial" : Give a prorated refund
             - "full" : Provide a full refund of the most recent charge
         """
-
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.terminate(refund=refund)
 
