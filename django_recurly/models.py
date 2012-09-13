@@ -54,15 +54,14 @@ class Account(TimeStampedModel):
         ordering = ["-id"]
         get_latest_by = "id"
 
-    def get_all_subscriptions(self):
-        """Get all subscriptions for this Account, including active and expired.
-        """
-        return self.subscription_set.all()
+    def is_active(self):
+        return self.state == 'active'
 
     def get_subscriptions(self, plan_code=None):
-        """Get all current subscriptions for this Account
+        """Get current (i.e. not 'expired') subscriptions for this Account. If
+        no `plan_code` is specified then all current subscriptions are returned.
 
-        An account may have multiple subscriptions of the same `plan_code`.
+        NOTE: An account may have multiple subscriptions of the same `plan_code`.
         """
         try:
             if plan_code is not None:
@@ -83,18 +82,24 @@ class Account(TimeStampedModel):
         else:
             return Subscription.current.get(account=self)
 
-    def is_active(self):
-        return self.state == 'active'
-
     def get_account(self):
         # TODO: Cache/store account object
         return recurly.Account.get(self.account_code)
+
+    def get_billing_info(self):
+        return self.get_recurly_account().billing_info
 
     def get_invoices(self):
         return self.get_recurly_account().invoices
 
     def get_transactions(self):
         return self.get_recurly_account().transactions
+
+    def close(self):
+        return self.get_recurly_account().delete()
+
+    def reopen(self):
+        return self.get_recurly_account().reopen()
 
     @classmethod
     def get_active(class_, user):
@@ -247,9 +252,13 @@ class Subscription(models.Model):
 
         This will call the Recurly API and update the subscription.
         """
+        if not len(kwargs):
+            logger.debug("Nothing to change for subscription %d", self.pk)
+            return
+
         recurly_subscription = recurly.Subscription.get(self.uuid)
 
-        for k, v in kwargs:
+        for k, v in kwargs.iteritems():
             setattr(recurly_subscription, k, v)
         recurly_subscription.timeframe = timeframe
 
@@ -315,8 +324,8 @@ class Payment(models.Model):
 
     @classmethod
     def handle_notification(class_, **kwargs):
-        recurly_transaction = recurly.Transaction().get(kwargs.get("transaction").id)
-        recurly_account = recurly.Account().get(kwargs.get("account").account_code)
+        recurly_transaction = recurly.Transaction.get(kwargs.get("transaction").id)
+        recurly_account = recurly.Account.get(kwargs.get("account").account_code)
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
         new_payment = bool(payment.pk is None)
