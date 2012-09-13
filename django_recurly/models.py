@@ -87,19 +87,25 @@ class Account(TimeStampedModel):
         return recurly.Account.get(self.account_code)
 
     def get_billing_info(self):
-        return self.get_recurly_account().billing_info
+        try:
+            return self.get_account().billing_info
+        except AttributeError:
+            return None
 
     def get_invoices(self):
-        return self.get_recurly_account().invoices
+        return self.get_account().invoices
 
     def get_transactions(self):
-        return self.get_recurly_account().transactions
+        try:
+            return self.get_account().transactions
+        except AttributeError:
+            return None
 
     def close(self):
-        return self.get_recurly_account().delete()
+        return self.get_account().delete()
 
     def reopen(self):
-        return self.get_recurly_account().reopen()
+        return self.get_account().reopen()
 
     @classmethod
     def get_active(class_, user):
