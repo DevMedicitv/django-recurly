@@ -23,10 +23,19 @@ class Command(BaseCommand):
             action='store_true',
             dest='subscriptions',
             default=False,
-            help='List all the subscriptions'),
+            help='Sync all live subscriptions'),
         make_option('--subscription',
             dest='subscription',
-            help='Get the specified subscription by uuid'),
+            help='Sync the specified subscription by uuid'),
+
+        make_option('--payments',
+            action='store_true',
+            dest='payments',
+            default=False,
+            help='Sync all payments'),
+        make_option('--payment',
+            dest='payment',
+            help='Sync the specified payment by transaction uuid'),
     )
 
     help = "Update local Django-Recurly data by querying Recurly. Recurly is assumed to be the point of authority, and this command will overwrite any local discprepancies (unless '--dry-run' is specified)."
@@ -60,10 +69,25 @@ class Command(BaseCommand):
                     i += 1
                 except recurly.resource.PageError:
                     page = None
-
         elif options['subscription']:
-            subscription = recurly.Subscription.get()
             Subscription.sync(uuid=options['subscription'])
+
+        elif options['payments']:
+            i = 1
+            page = recurly.Transaction.all()
+            while page is not None:
+                print("Syncing page %d..." % i)
+                for recurly_transaction in page:
+                    if recurly_transaction.action == 'verify':
+                        continue
+                    payment = Payment.sync(recurly_transaction=recurly_transaction)
+                try:
+                    page = page.next_page()
+                    i += 1
+                except recurly.resource.PageError:
+                    page = None
+        elif options['payment']:
+            Payment.sync(uuid=options['payment'])
 
         else:
             self.print_help(None, None)

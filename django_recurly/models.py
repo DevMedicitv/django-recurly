@@ -46,6 +46,7 @@ class Account(TimeStampedModel):
     company_name = models.CharField(max_length=100, blank=True, null=True)
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
 
     objects = models.Manager()
     active = ActiveAccountManager()
@@ -112,8 +113,26 @@ class Account(TimeStampedModel):
         return class_.active.filter(user=user).latest()
 
     @classmethod
+    def sync(class_, recurly_account=None, account_code=None):
+        if recurly_account is None:
+            recurly_account = recurly.Account.get(account_code)
+
+        account = modelify(recurly_account, class_)
+
+        try:
+            # Associate the account with the user who created it
+            account.user = User.objects.get(username=recurly_account.username)
+        except User.DoesNotExist:
+            # It's possible that a user may not exist locally (closed account)
+            account.user = None
+
+        account.save()
+        return account
+
+    @classmethod
     def handle_notification(class_, **kwargs):
-        """Update/create an account and its associated subscription using data from Recurly"""
+        """Update/create an account and its associated subscription using data
+        from Recurly"""
 
         # First get the up-to-date account details directly from Recurly and
         # convert it to a model instance, which will load an existing account
@@ -169,7 +188,7 @@ class Account(TimeStampedModel):
 
 
 class Subscription(models.Model):
-    account = models.ForeignKey(Account)
+    account = models.ForeignKey(Account, blank=True, null=True)
     uuid = models.CharField(max_length=40, unique=True)
     plan_code = models.CharField(max_length=100)
     plan_version = models.IntegerField(default=1)
@@ -292,8 +311,18 @@ class Subscription(models.Model):
         recurly_subscription.terminate(refund=refund)
 
     @classmethod
-    def get_plans():
+    def get_plans(class_):
         return [plan.name for plan in recurly.Plan.all()]
+
+    @classmethod
+    def sync(class_, recurly_subscription=None, uuid=None):
+        if recurly_subscription is None:
+            recurly_subscription = recurly.Subscription.get(uuid)
+
+        subscription = modelify(recurly_subscription, Subscription)
+
+        subscription.save()
+        return subscription
 
 class Payment(models.Model):
 
@@ -312,10 +341,10 @@ class Payment(models.Model):
     transaction_id = models.CharField(max_length=40)
     invoice_id = models.CharField(max_length=40, blank=True, null=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    created_at = models.DateTimeField(blank=True, null=True)
     amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     message = models.CharField(max_length=250)
+    created_at = models.DateTimeField(blank=True, null=True)
     xml = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -329,17 +358,41 @@ class Payment(models.Model):
         return recurly.Invoice.get(self.invoice_id)
 
     @classmethod
+    def sync(class_, recurly_transaction=None, uuid=None):
+        if recurly_transaction is None:
+            recurly_transaction = recurly.Transaction.get(uuid)
+
+        payment = modelify(recurly_transaction, class_, remove_empty=True)
+
+        payment.transaction_id = recurly_transaction.uuid
+        payment.invoice_id = recurly_transaction.invoice().uuid
+        if payment.xml is None:
+            payment.xml = recurly_transaction.details.to_element()
+
+        try:
+            payment.account = Account.objects.get(account_code=recurly_transaction.details.account.account_code)
+        except Exception as e:
+            logger.warning("Could not link payment (transaction '%s') to an account: %s", recurly_transaction.uuid, e)
+
+        payment.save()
+        return payment
+
+    @classmethod
     def handle_notification(class_, **kwargs):
         recurly_transaction = recurly.Transaction.get(kwargs.get("transaction").id)
-        recurly_account = recurly.Account.get(kwargs.get("account").account_code)
+        # recurly_account = recurly.Account.get(kwargs.get("account").account_code)
+        account_code = kwargs.get("account").account_code
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
         new_payment = bool(payment.pk is None)
 
         payment.transaction_id = recurly_transaction.uuid
         payment.invoice_id = recurly_transaction.invoice().uuid
-        payment.account = modelify(recurly_account, Account)
         payment.xml = kwargs.get('xml')
+        try:
+            payment.account = Account.objects.get(account_code=account_code)
+        except Account.DoesNotExist:
+            logger.warning("Could not link payment (transaction '%s') to an account because account_code '%s' doesn't exist", recurly_transaction.uuid, account_code)
 
         payment.save()
 
@@ -370,7 +423,7 @@ def modelify(resource, model, remove_empty=False, context={}):
     try:
         data = resource.to_dict()
     except AttributeError:
-        logger.debug("Nope, not a resource")
+        logger.debug("Nope, not a resource: %s (expected %s)", resource, model)
         pass
 
     for k, v in data.items():
@@ -398,10 +451,8 @@ def modelify(resource, model, remove_empty=False, context={}):
                 unique_fields[k] = v
 
             if k == "date" or k.endswith("_at"):
+                # TODO: Make sure dates are always in UTC and are tz-aware
                 pass
-                # TODO: Make sure dates are always in UTC and are aware
-                #print "%s: %s" % (k, v)
-                #v = iso8601.parse_date(v) if v else None
 
             # Always assume fields with limited choices should be lower case
             if v and fields_by_name[k].choices:

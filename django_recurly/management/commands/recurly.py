@@ -13,57 +13,54 @@ class Command(BaseCommand):
             action='store_true',
             dest='accounts',
             default=False,
-            help='List all the accounts'),
+            help='List all active accounts'),
         make_option('--account',
             dest='account',
-            help='Get the specified account by code'),
+            help='Get the specified account by account_code'),
 
-        make_option('--subscription',
-            dest='subscription',
-            help='Get the specified subscription by uuid'),
         make_option('--subscriptions',
             action='store_true',
             dest='subscriptions',
             default=False,
-            help='List all the subscriptions'),
+            help='List all subscriptions'),
+        make_option('--subscription',
+            dest='subscription',
+            help='Get the specified subscription by uuid'),
 
-        make_option('--plan',
-            dest='plan',
-            help='Get the specified plan by code'),
         make_option('--plans',
             action='store_true',
             dest='plans',
             default=False,
-            help='List all the subscriptions'),
-         )
+            help='List all available plans'),
+        make_option('--plan',
+            dest='plan',
+            help='Get the specified plan by plan_code'),
+    )
 
-    help = 'Display recurly data'
+    help = 'Query Recurly for current data.'
 
     def handle(self, *args, **options):
 
-        if options['account']:
-            account = recurly.Account.get(options['account'])
-            print(dump(account))
-
-        elif options['accounts']:
+        if options['accounts']:
             for account in recurly.Account.all_active():
                 print(dump(account))
-
-        elif options['plan']:
-            plan = recurly.Plan.get(options['plan'])
-            print(dump(plan))
-
-        elif options['plans']:
-            for plan in recurly.Plan.all():
-                print(dump(plan))
-
-        elif options['subscription']:
-            subscription = recurly.Subscription.get(options['subscription'])
-            print(dump(subscription))
+        elif options['account']:
+            account = recurly.Account.get(options['account'])
+            print(dump(account))
 
         elif options['subscriptions']:
             for subscription in recurly.Subscription.all():
                 print(dump(subscription))
+        elif options['subscription']:
+            subscription = recurly.Subscription.get(options['subscription'])
+            print(dump(subscription))
+
+        elif options['plans']:
+            for plan in recurly.Plan.all():
+                print(dump(plan))
+        elif options['plan']:
+            plan = recurly.Plan.get(options['plan'])
+            print(dump(plan))
 
         else:
             self.print_help(None, None)
