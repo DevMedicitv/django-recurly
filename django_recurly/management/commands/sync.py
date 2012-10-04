@@ -44,7 +44,7 @@ class Command(BaseCommand):
 
         if options['accounts']:
             i = 1
-            page = recurly.Account.all_active()
+            page = recurly.Account.all()
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_account in page:
@@ -54,12 +54,27 @@ class Command(BaseCommand):
                     i += 1
                 except recurly.resource.PageError:
                     page = None
+
         elif options['account']:
             Account.sync(account_code=options['account'])
 
         elif options['subscriptions']:
+            # Sync all 'live' subscriptions
             i = 1
             page = recurly.Subscription.all_live()
+            while page is not None:
+                print("Syncing page %d..." % i)
+                for recurly_subscription in page:
+                    subscription = Subscription.sync(recurly_subscription=recurly_subscription)
+                try:
+                    page = page.next_page()
+                    i += 1
+                except recurly.resource.PageError:
+                    page = None
+
+            # Now do the same with 'expired' subscriptions
+            i = 1
+            page = recurly.Subscription.all_expired()
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_subscription in page:

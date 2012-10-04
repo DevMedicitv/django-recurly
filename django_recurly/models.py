@@ -5,24 +5,12 @@ from django_extensions.db.models import TimeStampedModel
 from django.utils import timezone
 
 from django_recurly import recurly, signals
-from django_recurly.utils import dump
-
 # Do these here to ensure the handlers get hooked up
 import django_recurly.handlers
 
 import logging
 logger = logging.getLogger(__name__)
 
-ACCOUNT_STATES = (
-    ("active", "Active"),         # Active and everything is fine
-    ("closed", "Closed"),         # Account has been closed
-)
-
-SUBSCRIPTION_STATES = (
-    ("active", "Active"),         # Active and everything is fine
-    ("canceled", "Canceled"),     # Still active, but will not be renewed
-    ("expired", "Expired"),       # Did not renew, or was forcibly expired
-)
 
 __all__ = ("Account", "Subscription", "User", "Payment")
 
@@ -38,8 +26,14 @@ class CurrentSubscriptionManager(models.Manager):
 
 
 class Account(TimeStampedModel):
-    account_code = models.CharField(max_length=32, unique=True)
+    ACCOUNT_STATES = (
+        ("active", "Active"),         # Active and everything is fine
+        ("closed", "Closed"),         # Account has been closed
+    )
+
     user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
+    account_code = models.CharField(max_length=32, unique=True)
+    username = models.CharField(max_length=200)
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -54,6 +48,18 @@ class Account(TimeStampedModel):
     class Meta:
         ordering = ["-id"]
         get_latest_by = "id"
+
+    def save(self, *args, **kwargs):
+        if self.user is None:
+            try:
+                # Associate the account with a user
+                self.user = User.objects.get(username=self.username)
+            except User.DoesNotExist:
+                # It's possible that a user may not exist locally (closed account)
+                logger.debug("Could not find user for Recurly account (account_code: '%s') having username '%s'", self.account_code, self.username)
+                pass
+
+        super(Account, self).save(*args, **kwargs)
 
     def is_active(self):
         return self.state == 'active'
@@ -119,13 +125,6 @@ class Account(TimeStampedModel):
 
         account = modelify(recurly_account, class_)
 
-        try:
-            # Associate the account with the user who created it
-            account.user = User.objects.get(username=recurly_account.username)
-        except User.DoesNotExist:
-            # It's possible that a user may not exist locally (closed account)
-            account.user = None
-
         account.save()
         return account
 
@@ -139,13 +138,6 @@ class Account(TimeStampedModel):
         # for update (if one exists)
         recurly_account = recurly.Account.get(kwargs.get("account").account_code)
         account = modelify(recurly_account, class_)
-
-        try:
-            # Associate the account with the user who created it
-            account.user = User.objects.get(username=recurly_account.username)
-        except User.DoesNotExist:
-            # It's possible that a user may not exist locally (closed account)
-            account.user = None
 
         was_active = bool(class_.active.filter(pk=account.pk).count())
         now_active = account.is_active()
@@ -188,6 +180,12 @@ class Account(TimeStampedModel):
 
 
 class Subscription(models.Model):
+    SUBSCRIPTION_STATES = (
+        ("active", "Active"),         # Active and everything is fine
+        ("canceled", "Canceled"),     # Still active, but will not be renewed
+        ("expired", "Expired"),       # Did not renew, or was forcibly expired
+    )
+
     account = models.ForeignKey(Account, blank=True, null=True)
     uuid = models.CharField(max_length=40, unique=True)
     plan_code = models.CharField(max_length=100)
@@ -235,9 +233,8 @@ class Subscription(models.Model):
     def get_pending_changes(self):
         try:
             return recurly.objects_for_push_notification(self.xml).subscription.pending_subscription
-        except Exception:
-            logger.debug("Failed to get pending changes")
-            logger.debug(dump(recurly.objects_for_push_notification(self.xml)))
+        except Exception as e:
+            logger.debug("Failed to get pending changes: %s", e)
             return None
 
     def get_plan(self):
@@ -321,11 +318,15 @@ class Subscription(models.Model):
 
         subscription = modelify(recurly_subscription, Subscription)
 
+        # TODO: >>> Hacky
+        subscription.account.save()
+        subscription.account_id = subscription.account.pk
+
         subscription.save()
         return subscription
 
-class Payment(models.Model):
 
+class Payment(models.Model):
     ACTION_CHOICES = (
         ("purchase", "Purchase"),
         ("credit", "Credit"),
@@ -338,7 +339,7 @@ class Payment(models.Model):
     )
 
     account = models.ForeignKey(Account, blank=True, null=True)
-    transaction_id = models.CharField(max_length=40)
+    transaction_id = models.CharField(max_length=40, unique=True)
     invoice_id = models.CharField(max_length=40, blank=True, null=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
@@ -364,15 +365,19 @@ class Payment(models.Model):
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
 
-        payment.transaction_id = recurly_transaction.uuid
-        payment.invoice_id = recurly_transaction.invoice().uuid
-        if payment.xml is None:
-            payment.xml = recurly_transaction.details.to_element()
+        if payment.invoice_id is None:
+            payment.invoice_id = recurly_transaction.invoice().uuid
 
-        try:
-            payment.account = Account.objects.get(account_code=recurly_transaction.details.account.account_code)
-        except Exception as e:
-            logger.warning("Could not link payment (transaction '%s') to an account: %s", recurly_transaction.uuid, e)
+        # TODO: >>> Hacky
+        # `modelify()` doesn't assume you want to save every generated model
+        # object, including foreign relationships. So if the account has not
+        # been created before saving the payment, the payment row will have a
+        # null value for `account_id` (and the account will not be saved). Also,
+        # simply saving `payment.account` first isn't enough because Django
+        # doesn't automatically set `payment.account_id` to the generated pk,
+        # even though `payment.account.pk` *does* get set.
+        payment.account.save()
+        payment.account_id = payment.account.pk
 
         payment.save()
         return payment
@@ -380,22 +385,17 @@ class Payment(models.Model):
     @classmethod
     def handle_notification(class_, **kwargs):
         recurly_transaction = recurly.Transaction.get(kwargs.get("transaction").id)
-        # recurly_account = recurly.Account.get(kwargs.get("account").account_code)
         account_code = kwargs.get("account").account_code
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
         new_payment = bool(payment.pk is None)
 
-        payment.transaction_id = recurly_transaction.uuid
         payment.invoice_id = recurly_transaction.invoice().uuid
         payment.xml = kwargs.get('xml')
-        try:
-            payment.account = Account.objects.get(account_code=account_code)
-        except Account.DoesNotExist:
-            logger.warning("Could not link payment (transaction '%s') to an account because account_code '%s' doesn't exist", recurly_transaction.uuid, account_code)
 
         payment.save()
 
+        # TODO: >>> This should be a post-save signal
         if new_payment:
             signals.payment_created.send(sender=payment, payment=payment, account=payment.account)
         else:
@@ -404,20 +404,28 @@ class Payment(models.Model):
         return payment
 
 
-# TODO: Make this smarter, not necessary
-MODEL_MAP = {
-    'user': User,
-    'account': Account,
-    'subscription': Subscription,
-    'transaction': Payment,
-}
 
 def modelify(resource, model, remove_empty=False, context={}):
+    '''Modelify handles the dirty work of converting Recurly Resource objects to
+    Django model instances, including resolving any additional Resource objects
+    required to satisfy foreign key relationships. This method will query for
+    existing instances based on unique model fields, or return a new instance if
+    there is no match. Modelify does not save any models back to the database,
+    it is left up to the application logic to decide when to do that.'''
+
+    # TODO: Make this smarter, not necessary.
+    MODEL_MAP = {
+        'user': User,
+        'account': Account,
+        'subscription': Subscription,
+        'transaction': Payment,
+    }
+
     fields = set(field.name for field in model._meta.fields)
     fields_by_name = dict((field.name, field) for field in model._meta.fields)
     fields.discard("id")
 
-    logger.debug("Modelify: %s" % resource)
+    logger.debug("Modelify: %s", resource.nodename)
 
     data = resource
     try:
@@ -427,9 +435,14 @@ def modelify(resource, model, remove_empty=False, context={}):
         pass
 
     for k, v in data.items():
-        # Recursively replace known keys with actual models
-        if k in MODEL_MAP:
-            logger.debug("Modelifying a nested '%s'" % k)
+        # Expand 'uuid' to work with payment notifications and transaction API queries
+        if k == 'uuid' and hasattr(resource, 'nodename') and not hasattr(data, resource.nodename + '_id'):
+            data[resource.nodename + '_id'] = v
+
+        # Recursively replace links to known keys with actual models
+        # TODO: >>> Check that all expected foreign keys are mapped
+        if k in MODEL_MAP and k in fields:
+            logger.debug("Modelifying nested: %s", k)
 
             if isinstance(v, basestring):
                 try:
@@ -443,7 +456,8 @@ def modelify(resource, model, remove_empty=False, context={}):
             data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty)
 
     update = {}
-    unique_fields = dict()
+    unique_fields = {}
+
     for k, v in data.items():
         if k in fields:
             # Check for uniqueness so we can update existing objects
@@ -451,25 +465,32 @@ def modelify(resource, model, remove_empty=False, context={}):
                 unique_fields[k] = v
 
             if k == "date" or k.endswith("_at"):
-                # TODO: Make sure dates are always in UTC and are tz-aware
+                # TODO: >>> Make sure dates are always in UTC and are tz-aware
                 pass
 
-            # Always assume fields with limited choices should be lower case
+            # Fields with limited choices should always be lower case
             if v and fields_by_name[k].choices:
                 v = v.lower()
 
             if v or not remove_empty:
                 update[str(k)] = v
 
-    # Check for existing object
-    try:
-        obj = model.objects.get(**unique_fields)
-        logger.debug("Updating %s" % obj)
+    # Check for existing model object
+    if unique_fields:
+        try:
+            obj = model.objects.get(**unique_fields)
+            logger.debug("Updating %s", obj)
 
-        for k, v in update.items():
-            setattr(obj, k, v)
+            # Update fields
+            for k, v in update.items():
+                setattr(obj, k, v)
 
-        return obj
-    except model.DoesNotExist:
-        logger.debug("Returning new %s object" % model)
-        return model(**update)
+            return obj
+        except model.DoesNotExist:
+            logger.debug("No row found matching unique fields '%s'", unique_fields)
+            pass
+
+    # This is a new instance
+    # TODO: >>> Auto-save models?
+    logger.debug("Returning new %s object", model)
+    return model(**update)

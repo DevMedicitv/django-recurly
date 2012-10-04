@@ -7,9 +7,23 @@ notification action and the details of the action.
 http://docs.recurly.com/push-notifications
 """
 
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django_recurly.models import Account, Subscription, Payment
 from django_recurly import signals
 
-# Signal handlers
+# Model signal handlers
+# TODO: >>> Move model signals out of notification handlers and into here
+@receiver(post_save, sender=Subscription)
+def subscription_post_save(sender, instance, created, **kwargs):
+    pass
+
+# Connect model signal handlers
+
+post_save.connect(subscription_post_save, dispatch_uid="subscription_post_save")
+
+
+# Push notification signal handlers
 
 def new(sender, **kwargs):
     """Create the account and the subscription
@@ -29,7 +43,7 @@ def payment(sender, **kwargs):
     from django_recurly import models
     models.Payment.handle_notification(**kwargs)
 
-# Connect
+# Connect push notification signals
 
 #signals.new_account_notification.connect(new)
 signals.new_subscription_notification.connect(new)

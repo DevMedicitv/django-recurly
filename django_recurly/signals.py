@@ -7,30 +7,27 @@ from django.dispatch import Signal
 
 # Fired when an account changes
 account_updated = Signal(providing_args=('account','subscription'))
-
 # Fired when a user gains a valid (i.e. 'active') account
 account_opened = Signal(providing_args=('account','subscription'))
-
 # Fired when a user's active account is closed
 account_closed = Signal(providing_args=('account','subscription'))
 
+# Fired when a new subscription is created
+subscription_created = Signal(providing_args=('account','subscription'))
 # Fired when a subscription changes
 subscription_updated = Signal(providing_args=('account','subscription'))
-
 # Fired when a user gains a valid (i.e. not 'expired') subscription
 subscription_current = Signal(providing_args=('account','subscription'))
-
 # Fired when a user's subscription expires
 subscription_expired = Signal(providing_args=('account','subscription'))
 
 # Fired when a new payment is created
 payment_created = Signal(providing_args=('account','payment'))
-
 # Fired when a payment is modified
 payment_updated = Signal(providing_args=('account','payment'))
 
 
-## Notifications from recurly ##
+## Push notifications from Recurly ##
 
 # Accounts
 new_account_notification = Signal(

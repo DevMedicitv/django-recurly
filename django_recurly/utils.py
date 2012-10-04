@@ -5,6 +5,7 @@ import string
 import iso8601
 import json
 import re
+from django.core.serializers.json import DjangoJSONEncoder
 from datetime import datetime
 from copy import deepcopy
 
@@ -16,27 +17,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class RecurlyJsonEncoder(json.JSONEncoder):
+class RecurlyJsonEncoder(DjangoJSONEncoder):
     def __init__(self, js=False, *args, **kwargs):
         super(RecurlyJsonEncoder, self).__init__(*args, **kwargs)
         self.js = js
 
     def default(self, obj):
-        if isinstance(obj, datetime) or \
-                isinstance(obj, recurly.resource.Money):
+        if isinstance(obj, recurly.resource.Money):
             return str(obj)
 
         # Resolve 'relatiator' attributes
         if callable(obj):
             result = obj()
             try:
-                logger.debug(self.js)
                 return result.to_dict(js=self.js)
             except:
                 return result
 
         if isinstance(obj, recurly.Resource):
-            logger.debug(self.js)
             return obj.to_dict(js=self.js)
 
         try:
@@ -45,7 +43,7 @@ class RecurlyJsonEncoder(json.JSONEncoder):
         except:
             pass
 
-        return json.JSONEncoder.default(self, obj)
+        return DjangoJSONEncoder.default(self, obj)
 
 
 def dump(obj, encoder=RecurlyJsonEncoder, js=False):
