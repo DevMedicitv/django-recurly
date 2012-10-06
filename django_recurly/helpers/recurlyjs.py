@@ -34,9 +34,10 @@ def get_subscription_form(plan_code, user, target_element='#recurly-container', 
     data['signature'] = get_signature(data)
 
     # Unprotected params
-    data['target'] = target_element
-    dict_merge(data, unprotected_params)
-
+    unprotected_data = {
+        'target': target_element
+    }
+    data = dict_merge({}, unprotected_data, unprotected_params, data)
     data['json'] = dump(data, js=True)
 
     return render_to_string("django_recurly/build_subscription_form.js", data)
@@ -58,9 +59,13 @@ def get_billing_info_update_form(user, account, target_element='#recurly-contain
     data['signature'] = get_signature(data)
 
     # Unprotected params
-    data['target'] = target_element
-    dict_merge(data, {'account': account.to_dict(js=True), 'billing_info': account.billing_info.to_dict(js=True)}, unprotected_params)
-
+    unprotected_data = {
+        'target': target_element,
+        'distinguish_contact_from_billing_info': False,
+        'account': account.to_dict(js=True),
+        'billing_info': account.billing_info.to_dict(js=True)
+    }
+    data = dict_merge({}, unprotected_data, unprotected_params, data)
     data['json'] = dump(data, js=True)
 
     return render_to_string("django_recurly/build_billing_info_update_form.js", data)

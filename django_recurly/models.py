@@ -4,9 +4,11 @@ from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
 from django.utils import timezone
 
-from django_recurly import recurly, signals
+from django_recurly import recurly
+
 # Do these here to ensure the handlers get hooked up
-import django_recurly.handlers
+from django_recurly import handlers
+from django.db.models.signals import post_save
 
 import logging
 logger = logging.getLogger(__name__)
@@ -25,7 +27,60 @@ class CurrentSubscriptionManager(models.Manager):
         return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(state__in=("active", "canceled")))  # But not 'expired'
 
 
-class Account(TimeStampedModel):
+class SaveDirtyModel(models.Model):
+    """ Only allows new and modified models to be saved. """
+
+    SMART_SAVE_FORCE = False
+    SMART_SAVE_IGNORE_FIELDS = ()
+
+    class Meta:
+        abstract = True
+
+    def __init__(self, *args, **kwargs):
+        super(SaveDirtyModel, self).__init__(*args, **kwargs)
+        self._original_state = self._as_dict()
+        self._previous_state = self._original_state
+
+    def _iter_fields(self):
+        for field in self._meta.fields: # m2m changes do not require a save
+            if field.name in self.SMART_SAVE_IGNORE_FIELDS:
+                continue
+            field_name = '%s_id' % field.name if field.rel else field.name
+            yield (field.name, getattr(self, field_name))
+
+    def _as_dict(self):
+        return dict(self._iter_fields())
+
+    def is_dirty(self):
+        if not self.pk:
+            return True
+        for field, value in self._iter_fields():
+            if value != self._original_state[field]:
+                return True
+        return False
+
+    def dirty_fields(self, names_only=False):
+        diff = [] if names_only else {}
+        for field, value in self._iter_fields():
+            if value != self._original_state[field]:
+                if names_only:
+                    diff.append(field)
+                else:
+                    diff[field] = {
+                        'new': value,
+                        'old': self._original_state[field],
+                    }
+        return diff
+
+    def save(self, *args, **kwargs):
+        self._force_save = kwargs.pop('force', self.SMART_SAVE_FORCE)
+        if self._force_save or self.is_dirty():
+            super(SaveDirtyModel, self).save(*args, **kwargs)
+            self._previous_state = self._original_state
+            self._original_state = self._as_dict()
+
+
+class Account(SaveDirtyModel, TimeStampedModel):
     ACCOUNT_STATES = (
         ("active", "Active"),         # Active and everything is fine
         ("closed", "Closed"),         # Account has been closed
@@ -81,8 +136,8 @@ class Account(TimeStampedModel):
     def get_subscription(self, plan_code=None):
         """Get current subscription of type `plan_code` for this Account.
 
-        An exception will be raised if the account has more than one
-        subscription of this type.
+        An exception will be raised if the account has more than one non-expired
+        subscription of the specified type.
         """
         if plan_code is not None:
             return Subscription.current.get(account=self, plan_code=plan_code)
@@ -134,15 +189,8 @@ class Account(TimeStampedModel):
         from Recurly"""
 
         # First get the up-to-date account details directly from Recurly and
-        # convert it to a model instance, which will load an existing account
-        # for update (if one exists)
-        recurly_account = recurly.Account.get(kwargs.get("account").account_code)
-        account = modelify(recurly_account, class_)
-
-        was_active = bool(class_.active.filter(pk=account.pk).count())
-        now_active = account.is_active()
-
-        account.save()
+        # sync local record (update existing, or create new)
+        account = class_.sync(account_code=kwargs.get("account").account_code)
 
         # Now do the same with the subscription (if there is one)
         if not kwargs.get("subscription"):
@@ -152,34 +200,12 @@ class Account(TimeStampedModel):
             subscription = modelify(recurly_subscription, Subscription)
             subscription.xml = kwargs.get('xml')
 
-            if subscription.pk is None:
-                was_current = False
-            else:
-                was_current = bool(Subscription.current.filter(pk=subscription.pk).count())
-            now_current = subscription.state != 'expired'
-
             subscription.save()
-
-            signals.subscription_updated.send(sender=account, account=account, subscription=subscription)
-
-            # Send account closed/opened signals
-            if was_current and not now_current:
-                signals.subscription_expired.send(sender=account, account=account, subscription=subscription)
-            elif not was_current and now_current:
-                signals.subscription_current.send(sender=account, account=account, subscription=subscription)
-
-        signals.account_updated.send(sender=account, account=account, subscription=subscription)
-
-        # Send account closed/opened signals
-        if was_active and not now_active:
-            signals.account_closed.send(sender=account, account=account, subscription=subscription)
-        elif not was_active and now_active:
-            signals.account_opened.send(sender=account, account=account, subscription=subscription)
 
         return account, subscription
 
 
-class Subscription(models.Model):
+class Subscription(SaveDirtyModel):
     SUBSCRIPTION_STATES = (
         ("active", "Active"),         # Active and everything is fine
         ("canceled", "Canceled"),     # Still active, but will not be renewed
@@ -319,14 +345,15 @@ class Subscription(models.Model):
         subscription = modelify(recurly_subscription, Subscription)
 
         # TODO: >>> Hacky
-        subscription.account.save()
-        subscription.account_id = subscription.account.pk
+        if subscription.account.is_dirty():
+            subscription.account.save()
+            subscription.account_id = subscription.account.pk
 
         subscription.save()
         return subscription
 
 
-class Payment(models.Model):
+class Payment(SaveDirtyModel):
     ACTION_CHOICES = (
         ("purchase", "Purchase"),
         ("credit", "Credit"),
@@ -376,8 +403,9 @@ class Payment(models.Model):
         # simply saving `payment.account` first isn't enough because Django
         # doesn't automatically set `payment.account_id` to the generated pk,
         # even though `payment.account.pk` *does* get set.
-        payment.account.save()
-        payment.account_id = payment.account.pk
+        if payment.account.is_dirty():
+            payment.account.save()
+            payment.account_id = payment.account.pk
 
         payment.save()
         return payment
@@ -385,25 +413,29 @@ class Payment(models.Model):
     @classmethod
     def handle_notification(class_, **kwargs):
         recurly_transaction = recurly.Transaction.get(kwargs.get("transaction").id)
-        account_code = kwargs.get("account").account_code
+        # account_code = kwargs.get("account").account_code
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
-        new_payment = bool(payment.pk is None)
-
         payment.invoice_id = recurly_transaction.invoice().uuid
         payment.xml = kwargs.get('xml')
 
-        payment.save()
+        if payment.account.is_dirty():
+            payment.account.save()
+            payment.account_id = payment.account.pk
 
-        # TODO: >>> This should be a post-save signal
-        if new_payment:
-            signals.payment_created.send(sender=payment, payment=payment, account=payment.account)
-        else:
-            signals.payment_updated.send(sender=payment, payment=payment, account=payment.account)
+        payment.save()
 
         return payment
 
 
+# Connect model signal handlers
+
+post_save.connect(handlers.account_post_save, sender=Account, dispatch_uid="account_post_save")
+post_save.connect(handlers.subscription_post_save, sender=Subscription, dispatch_uid="subscription_post_save")
+post_save.connect(handlers.payment_post_save, sender=Payment, dispatch_uid="payment_post_save")
+
+
+### Helpers ###
 
 def modelify(resource, model, remove_empty=False, context={}):
     '''Modelify handles the dirty work of converting Recurly Resource objects to
@@ -460,7 +492,8 @@ def modelify(resource, model, remove_empty=False, context={}):
 
     for k, v in data.items():
         if k in fields:
-            # Check for uniqueness so we can update existing objects
+            # Check for uniqueness so we can update existing objects if they
+            # exist
             if v and fields_by_name[k].unique:
                 unique_fields[k] = v
 

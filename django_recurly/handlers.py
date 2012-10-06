@@ -6,21 +6,7 @@ notification action and the details of the action.
 
 http://docs.recurly.com/push-notifications
 """
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django_recurly.models import Account, Subscription, Payment
 from django_recurly import signals
-
-# Model signal handlers
-# TODO: >>> Move model signals out of notification handlers and into here
-@receiver(post_save, sender=Subscription)
-def subscription_post_save(sender, instance, created, **kwargs):
-    pass
-
-# Connect model signal handlers
-
-post_save.connect(subscription_post_save, dispatch_uid="subscription_post_save")
 
 
 # Push notification signal handlers
@@ -60,3 +46,42 @@ signals.successful_payment_notification.connect(payment)
 signals.failed_payment_notification.connect(payment)
 signals.successful_refund_notification.connect(payment)
 signals.void_payment_notification.connect(payment)
+
+
+## Model signal handlers ##
+
+def account_post_save(sender, instance, created, **kwargs):
+    if created:
+        signals.account_created.send(sender=sender, account=instance)
+    else:
+        signals.account_updated.send(sender=sender, account=instance)
+
+    was_active = not created and instance._previous_state['state'] == 'active'
+    now_active = instance.is_active()
+
+    # Send account closed/opened signals
+    if was_active and not now_active:
+        signals.account_closed.send(sender=sender, account=instance)
+    elif not was_active and now_active:
+        signals.account_opened.send(sender=sender, account=instance)
+
+def subscription_post_save(sender, instance, created, **kwargs):
+    if created:
+        signals.subscription_created.send(sender=sender, subscription=instance)
+    else:
+        signals.subscription_updated.send(sender=sender, subscription=instance)
+
+    was_current = not created and instance._previous_state['state'] != 'expired'
+    now_current = instance.state != 'expired'
+
+    # Send subscription current/expired signals
+    if was_current and not now_current:
+        signals.subscription_expired.send(sender=sender, subscription=instance)
+    elif not was_current and now_current:
+        signals.subscription_current.send(sender=sender, subscription=instance)
+
+def payment_post_save(sender, instance, created, **kwargs):
+    if created:
+        signals.payment_created.send(sender=sender, payment=instance)
+    else:
+        signals.payment_updated.send(sender=sender, payment=instance)
