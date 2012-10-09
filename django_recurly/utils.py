@@ -54,7 +54,6 @@ def dump(obj, encoder=RecurlyJsonEncoder, js=False):
         pass
 
     data = to_camel(data, js=js)
-    logger.debug(data)
 
     return json.dumps(
         data,
@@ -62,7 +61,6 @@ def dump(obj, encoder=RecurlyJsonEncoder, js=False):
         indent=2,
         cls=encoder,
         js=js)
-
 
 
 def hosted_login_url(hosted_login_token):

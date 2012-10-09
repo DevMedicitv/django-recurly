@@ -42,7 +42,7 @@ class SaveDirtyModel(models.Model):
         self._previous_state = self._original_state
 
     def _iter_fields(self):
-        for field in self._meta.fields: # m2m changes do not require a save
+        for field in self._meta.fields:  # m2m changes do not require a save
             if field.name in self.SMART_SAVE_IGNORE_FIELDS:
                 continue
             field_name = '%s_id' % field.name if field.rel else field.name
