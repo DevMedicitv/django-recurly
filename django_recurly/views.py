@@ -5,35 +5,31 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 
-import logging
-
 from .decorators import recurly_basic_authentication
-from .utils import dump, safe_redirect
+from .utils import safe_redirect
 from . import recurly, models, signals
 
+import logging
+
 logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
 @recurly_basic_authentication
 @require_POST
 def push_notifications(request):
 
-    logger.debug(request.raw_post_data)
-
     xml = request.raw_post_data
     objects = recurly.objects_for_push_notification(xml.strip())
-
-    logger.debug("Notification objects: ")
-    logger.debug(dump(objects))
 
     try:
         signal = getattr(signals, objects['type'])
     except AttributeError:
-        return HttpResponseBadRequest("Invalid notification name.")
+        return HttpResponseBadRequest("Invalid notification type.")
 
-    # data is being passed for backwards capability.
     signal.send(sender=recurly, xml=xml, **objects)
     return HttpResponse()
+
 
 @login_required
 @require_POST
@@ -47,6 +43,7 @@ def change_plan(request):
     redirect_to = request.POST.get("redirect_to", None)
 
     return safe_redirect(request, redirect_to)
+
 
 @login_required
 def account(request):
