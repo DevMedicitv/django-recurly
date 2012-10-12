@@ -1,4 +1,4 @@
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
@@ -28,6 +28,48 @@ def push_notifications(request):
         return HttpResponseBadRequest("Invalid notification type.")
 
     signal.send(sender=recurly, xml=xml, **objects)
+    return HttpResponse()
+
+
+@login_required
+@require_POST
+def success_token(request):
+    recurly_token = request.POST.get("recurly_token")
+    account = get_object_or_404(models.Account.active, user=request.user)
+
+    token = models.Token(token=recurly_token, account=account)
+
+    try:
+        result = recurly.js.fetch(recurly_token)
+    except Exception as e:
+        logger.warning("Failed to fetch details for success token '%s': %s", recurly_token, e)
+        token.save()
+        return HttpResponse()
+
+    token.cls = result.nodename
+    if result.nodename == 'billing_info':
+        token.identifier = result.account().account_code
+        signal = signals.billing_info_token_created
+
+        models.Account.sync(account_code=token.identifier)
+    elif result.nodename == 'subscription':
+        token.identifier = result.uuid
+        signal = signals.subscription_token_created
+
+        models.Subscription.sync(uuid=token.identifier)
+    elif result.nodename == 'invoice':
+        token.identifier = result.uuid
+        signal = signals.invoice_token_created
+
+        models.Payment.sync(uuid=token.identifier)
+
+    # TODO: (IW) The Recurly client doesn't actually provide access to the raw
+    # xml, so the xml field isn't storing anything useful. Add it?
+    token.xml = result.as_log_output()
+    token.save()
+
+    signal.send(sender=recurly, token=token, account=account)
+
     return HttpResponse()
 
 

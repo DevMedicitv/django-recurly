@@ -38,7 +38,7 @@ def subscription_form(context, plan_code, target_element="#recurly-container", p
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
 
-        #TODO: Simplify
+        # TODO: (IW) Simplify
         if 'account' in unprotected_params:
             unprotected_params["account"] = dict_merge(account.to_dict(js=True), unprotected_params["account"])
         else:
@@ -62,7 +62,7 @@ def billing_info_update_form(context, target_element="#recurly-container", prote
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
 
-        #TODO: Simplify
+        #TODO: (IW) Simplify
         if 'account' in unprotected_params:
             unprotected_params["account"] = dict_merge(account.to_dict(js=True), unprotected_params["account"])
         else:

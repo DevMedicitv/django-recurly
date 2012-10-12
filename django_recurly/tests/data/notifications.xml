@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<canceled_account_notification>
+    <account>
+        <account_code>ian+bodiddly@sprint.ly</account_code>
+        <username>ian+bodiddly@sprint.ly</username>
+        <email>ian+bodiddly@sprint.ly</email>
+        <first_name>Bo</first_name>
+        <last_name>Diddly</last_name>
+        <company_name nil="true"></company_name>
+    </account>
+</canceled_account_notification>
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<canceled_subscription_notification>
+    <account>
+        <account_code>ian+bodiddly@sprint.ly</account_code>
+        <username>ian+bodiddly@sprint.ly</username>
+        <email>ian+bodiddly@sprint.ly</email>
+        <first_name>Bo</first_name>
+        <last_name>Diddly</last_name>
+        <company_name nil="true"></company_name>
+    </account>
+    <subscription>
+        <plan>
+            <plan_code>sprintly9</plan_code>
+            <name>Sprint.ly @ $9/teammate/mo.</name>
+        </plan>
+        <uuid>1b0745160c87c95750874b419b98e33a</uuid>
+        <state>canceled</state>
+        <quantity type="integer">4</quantity>
+        <total_amount_in_cents type="integer">3600</total_amount_in_cents>
+        <activated_at type="datetime">2012-09-05T22:08:05Z</activated_at>
+        <canceled_at type="datetime">2012-09-11T23:53:14Z</canceled_at>
+        <expires_at type="datetime">2012-10-05T22:08:05Z</expires_at>
+        <current_period_started_at type="datetime">2012-09-05T22:08:05Z</current_period_started_at>
+        <current_period_ends_at type="datetime">2012-10-05T22:08:05Z</current_period_ends_at>
+        <trial_started_at type="datetime">2012-09-05T22:08:05Z</trial_started_at>
+        <trial_ends_at type="datetime">2012-10-05T22:08:05Z</trial_ends_at>
+    </subscription>
+</canceled_subscription_notification>
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<successful_payment_notification>
+    <account>
+        <account_code>bob@jones.com</account_code>
+        <username>bob@jones.com</username>
+        <email>bob@jones.com</email>
+        <first_name>Bob</first_name>
+        <last_name>Jones</last_name>
+        <company_name></company_name>
+    </account>
+    <transaction>
+        <id>1ad9804278b4504ef51b8e480cbf3cb8</id>
+        <invoice_id>1ad980424fed574b1702fb42dbbdb062</invoice_id>
+        <invoice_number type="integer">1002</invoice_number>
+        <subscription_id>1ad98041fdaa1917af21c84113be3c7c</subscription_id>
+        <action>purchase</action>
+        <date type="datetime">2012-08-28T00:50:11Z</date>
+        <amount_in_cents type="integer">900</amount_in_cents>
+        <status>success</status>
+        <message>Successful test transaction</message>
+        <reference>4946769</reference>
+        <source>subscription</source>
+        <cvv_result code="M">Match</cvv_result>
+        <avs_result code="D">Street address and postal code match.</avs_result>
+        <avs_result_street nil="true"></avs_result_street>
+        <avs_result_postal nil="true"></avs_result_postal>
+        <test type="boolean">true</test>
+        <voidable type="boolean">true</voidable>
+        <refundable type="boolean">true</refundable>
+    </transaction>
+</successful_payment_notification>
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<new_subscription_notification>
+    <account>
+        <account_code>bob@jones.com</account_code>
+        <username>bob@jones.com</username>
+        <email>bob@jones.com</email>
+        <first_name>Bob</first_name>
+        <last_name>Jones</last_name>
+        <company_name></company_name>
+    </account>
+    <subscription>
+        <plan>
+            <plan_code>sprintly9</plan_code>
+            <name>Sprint.ly @ $9/teammate/mo.</name>
+        </plan>
+        <uuid>1ad98041fdaa1917af21c84113be3c7c</uuid>
+        <state>active</state>
+        <quantity type="integer">1</quantity>
+        <total_amount_in_cents type="integer">900</total_amount_in_cents>
+        <activated_at type="datetime">2012-08-28T00:50:11Z</activated_at>
+        <canceled_at type="datetime"></canceled_at>
+        <expires_at type="datetime"></expires_at>
+        <current_period_started_at type="datetime">2012-08-28T00:50:11Z</current_period_started_at>
+        <current_period_ends_at type="datetime">2012-09-28T00:50:11Z</current_period_ends_at>
+        <trial_started_at type="datetime"></trial_started_at>
+        <trial_ends_at type="datetime"></trial_ends_at>
+    </subscription>
+</new_subscription_notification>
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<successful_payment_notification>
+    <account>
+        <account_code>bob@jones.com</account_code>
+        <username>bob@jones.com</username>
+        <email>bob@jones.com</email>
+        <first_name>Bob</first_name>
+        <last_name>Jones</last_name>
+        <company_name></company_name>
+    </account>
+    <transaction>
+        <id>1ad9804278b4504ef51b8e480cbf3cb8</id>
+        <invoice_id>1ad980424fed574b1702fb42dbbdb062</invoice_id>
+        <invoice_number type="integer">1002</invoice_number>
+        <subscription_id>1ad98041fdaa1917af21c84113be3c7c</subscription_id>
+        <action>purchase</action>
+        <date type="datetime">2012-08-28T00:50:11Z</date>
+        <amount_in_cents type="integer">900</amount_in_cents>
+        <status>success</status>
+        <message>Successful test transaction</message>
+        <reference>4946769</reference>
+        <source>subscription</source>
+        <cvv_result code="M">Match</cvv_result>
+        <avs_result code="D">Street address and postal code match.</avs_result>
+        <avs_result_street nil="true"></avs_result_street>
+        <avs_result_postal nil="true"></avs_result_postal>
+        <test type="boolean">true</test>
+        <voidable type="boolean">true</voidable>
+        <refundable type="boolean">true</refundable>
+    </transaction>
+</successful_payment_notification>

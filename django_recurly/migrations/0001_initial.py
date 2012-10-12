@@ -13,21 +13,23 @@ class Migration(SchemaMigration):
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
             ('modified', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
-            ('account_code', self.gf('django.db.models.fields.CharField')(unique=True, max_length=32)),
             ('user', self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='recurly_account', null=True, on_delete=models.SET_NULL, to=orm['auth.User'])),
+            ('account_code', self.gf('django.db.models.fields.CharField')(unique=True, max_length=32)),
+            ('username', self.gf('django.db.models.fields.CharField')(max_length=200)),
             ('email', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('first_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('last_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('company_name', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
             ('state', self.gf('django.db.models.fields.CharField')(default='active', max_length=20)),
             ('hosted_login_token', self.gf('django.db.models.fields.CharField')(max_length=32, null=True, blank=True)),
+            ('created_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
         ))
         db.send_create_signal('django_recurly', ['Account'])
 
         # Adding model 'Subscription'
         db.create_table('django_recurly_subscription', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('account', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['django_recurly.Account'])),
+            ('account', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['django_recurly.Account'], null=True, blank=True)),
             ('uuid', self.gf('django.db.models.fields.CharField')(unique=True, max_length=40)),
             ('plan_code', self.gf('django.db.models.fields.CharField')(max_length=100)),
             ('plan_version', self.gf('django.db.models.fields.IntegerField')(default=1)),
@@ -42,6 +44,7 @@ class Migration(SchemaMigration):
             ('current_period_ends_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('trial_started_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('trial_ends_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
+            ('xml', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
         ))
         db.send_create_signal('django_recurly', ['Subscription'])
 
@@ -49,15 +52,29 @@ class Migration(SchemaMigration):
         db.create_table('django_recurly_payment', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('account', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['django_recurly.Account'], null=True, blank=True)),
-            ('transaction_id', self.gf('django.db.models.fields.CharField')(max_length=40)),
+            ('transaction_id', self.gf('django.db.models.fields.CharField')(unique=True, max_length=40)),
             ('invoice_id', self.gf('django.db.models.fields.CharField')(max_length=40, null=True, blank=True)),
             ('action', self.gf('django.db.models.fields.CharField')(max_length=10)),
-            ('created_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
             ('amount_in_cents', self.gf('django.db.models.fields.IntegerField')(null=True, blank=True)),
             ('status', self.gf('django.db.models.fields.CharField')(max_length=10)),
             ('message', self.gf('django.db.models.fields.CharField')(max_length=250)),
+            ('created_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
+            ('xml', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
         ))
         db.send_create_signal('django_recurly', ['Payment'])
+
+        # Adding model 'Token'
+        db.create_table('django_recurly_token', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
+            ('modified', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
+            ('account', self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='tokens', null=True, to=orm['django_recurly.Account'])),
+            ('token', self.gf('django.db.models.fields.CharField')(unique=True, max_length=40)),
+            ('cls', self.gf('django.db.models.fields.CharField')(max_length=12)),
+            ('identifier', self.gf('django.db.models.fields.CharField')(max_length=40)),
+            ('xml', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
+        ))
+        db.send_create_signal('django_recurly', ['Token'])
 
 
     def backwards(self, orm):
@@ -69,6 +86,9 @@ class Migration(SchemaMigration):
 
         # Deleting model 'Payment'
         db.delete_table('django_recurly_payment')
+
+        # Deleting model 'Token'
+        db.delete_table('django_recurly_token')
 
 
     models = {
@@ -113,6 +133,7 @@ class Migration(SchemaMigration):
             'account_code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '32'}),
             'company_name': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
             'created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
+            'created_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'email': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'first_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'hosted_login_token': ('django.db.models.fields.CharField', [], {'max_length': '32', 'null': 'True', 'blank': 'True'}),
@@ -120,7 +141,8 @@ class Migration(SchemaMigration):
             'last_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
             'modified': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
             'state': ('django.db.models.fields.CharField', [], {'default': "'active'", 'max_length': '20'}),
-            'user': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'recurly_account'", 'null': 'True', 'on_delete': 'models.SET_NULL', 'to': "orm['auth.User']"})
+            'user': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'recurly_account'", 'null': 'True', 'on_delete': 'models.SET_NULL', 'to': "orm['auth.User']"}),
+            'username': ('django.db.models.fields.CharField', [], {'max_length': '200'})
         },
         'django_recurly.payment': {
             'Meta': {'ordering': "['-id']", 'object_name': 'Payment'},
@@ -132,11 +154,12 @@ class Migration(SchemaMigration):
             'invoice_id': ('django.db.models.fields.CharField', [], {'max_length': '40', 'null': 'True', 'blank': 'True'}),
             'message': ('django.db.models.fields.CharField', [], {'max_length': '250'}),
             'status': ('django.db.models.fields.CharField', [], {'max_length': '10'}),
-            'transaction_id': ('django.db.models.fields.CharField', [], {'max_length': '40'})
+            'transaction_id': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '40'}),
+            'xml': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'})
         },
         'django_recurly.subscription': {
             'Meta': {'ordering': "['-id']", 'object_name': 'Subscription'},
-            'account': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['django_recurly.Account']"}),
+            'account': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['django_recurly.Account']", 'null': 'True', 'blank': 'True'}),
             'activated_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'canceled_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'currency': ('django.db.models.fields.CharField', [], {'default': "'USD'", 'max_length': '3'}),
@@ -151,7 +174,19 @@ class Migration(SchemaMigration):
             'trial_ends_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'trial_started_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'unit_amount_in_cents': ('django.db.models.fields.IntegerField', [], {'null': 'True', 'blank': 'True'}),
-            'uuid': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '40'})
+            'uuid': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '40'}),
+            'xml': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'})
+        },
+        'django_recurly.token': {
+            'Meta': {'object_name': 'Token'},
+            'account': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'tokens'", 'null': 'True', 'to': "orm['django_recurly.Account']"}),
+            'cls': ('django.db.models.fields.CharField', [], {'max_length': '12'}),
+            'created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'identifier': ('django.db.models.fields.CharField', [], {'max_length': '40'}),
+            'modified': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
+            'token': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '40'}),
+            'xml': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'})
         }
     }
 

@@ -20,10 +20,12 @@ def new(sender, **kwargs):
     from django_recurly import models
     models.Account.handle_notification(**kwargs)
 
+
 def update(sender, **kwargs):
     """Update a subscription and account"""
     from django_recurly import models
     models.Account.handle_notification(**kwargs)
+
 
 def payment(sender, **kwargs):
     from django_recurly import models
@@ -65,6 +67,7 @@ def account_post_save(sender, instance, created, **kwargs):
     elif not was_active and now_active:
         signals.account_opened.send(sender=sender, account=instance)
 
+
 def subscription_post_save(sender, instance, created, **kwargs):
     if created:
         signals.subscription_created.send(sender=sender, subscription=instance)
@@ -80,8 +83,19 @@ def subscription_post_save(sender, instance, created, **kwargs):
     elif not was_current and now_current:
         signals.subscription_current.send(sender=sender, subscription=instance)
 
+
 def payment_post_save(sender, instance, created, **kwargs):
     if created:
         signals.payment_created.send(sender=sender, payment=instance)
     else:
         signals.payment_updated.send(sender=sender, payment=instance)
+
+
+def token_post_save(sender, instance, created, **kwargs):
+    if type == 'subscription':
+
+        signals.subscription_token_created.send(sender=sender, token=instance)
+    elif type == 'billing_info':
+        signals.billing_info_token_created.send(sender=sender, payment=instance)
+    elif type == 'invoice':
+        signals.invoice_token_created.send(sender=sender, payment=instance)

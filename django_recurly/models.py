@@ -14,7 +14,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-__all__ = ("Account", "Subscription", "User", "Payment")
+__all__ = ("Account", "Subscription", "User", "Payment", "Token")
 
 
 class ActiveAccountManager(models.Manager):
@@ -24,11 +24,11 @@ class ActiveAccountManager(models.Manager):
 
 class CurrentSubscriptionManager(models.Manager):
     def get_query_set(self):
-        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(state__in=("active", "canceled")))  # But not 'expired'
+        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(state__in=("active", "canceled")))  # i.e. not 'expired'
 
 
 class SaveDirtyModel(models.Model):
-    """ Only allows new and modified models to be saved. """
+    """ Save only when new or modified. """
 
     SMART_SAVE_FORCE = False
     SMART_SAVE_IGNORE_FIELDS = ()
@@ -88,7 +88,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
     account_code = models.CharField(max_length=32, unique=True)
-    username = models.CharField(max_length=200)
+    username = models.CharField(max_length=200, blank=False, null=False)
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -145,7 +145,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             return Subscription.current.get(account=self)
 
     def get_account(self):
-        # TODO: Cache/store account object
+        # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
 
     def get_billing_info(self):
@@ -218,7 +218,7 @@ class Subscription(SaveDirtyModel):
     plan_version = models.IntegerField(default=1)
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
-    unit_amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
+    unit_amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")
     activated_at = models.DateTimeField(blank=True, null=True)
     canceled_at = models.DateTimeField(blank=True, null=True)
@@ -248,7 +248,7 @@ class Subscription(SaveDirtyModel):
 
     def is_trial(self):
         if not self.trial_started_at or not self.trial_ends_at:
-            return False # No trial dates, so not a trial
+            return False  # No trial dates, so not a trial
 
         now = timezone.now()
         if self.trial_started_at <= now and self.trial_ends_at > now:
@@ -313,12 +313,14 @@ class Subscription(SaveDirtyModel):
         recurly_subscription.save()
 
     def cancel(self):
-        """Cancel the subscription, it will expire at the end of the current billing cycle"""
+        """Cancel the subscription, it will expire at the end of the current
+        billing cycle"""
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.cancel()
 
     def reactivate(self):
-        """Reactivate the cancelled subscription so it renews at the end of the current billing cycle"""
+        """Reactivate the cancelled subscription so it renews at the end of the
+        current billing cycle"""
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.reactivate()
 
@@ -344,7 +346,7 @@ class Subscription(SaveDirtyModel):
 
         subscription = modelify(recurly_subscription, Subscription)
 
-        # TODO: >>> Hacky
+        # TODO: (IW) Hacky
         if subscription.account.is_dirty():
             subscription.account.save()
             subscription.account_id = subscription.account.pk
@@ -369,7 +371,7 @@ class Payment(SaveDirtyModel):
     transaction_id = models.CharField(max_length=40, unique=True)
     invoice_id = models.CharField(max_length=40, blank=True, null=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    amount_in_cents = models.IntegerField(blank=True, null=True) # Not always in cents!
+    amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in 'cents' (i8n)!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     message = models.CharField(max_length=250)
     created_at = models.DateTimeField(blank=True, null=True)
@@ -395,7 +397,7 @@ class Payment(SaveDirtyModel):
         if payment.invoice_id is None:
             payment.invoice_id = recurly_transaction.invoice().uuid
 
-        # TODO: >>> Hacky
+        # TODO: (IW) Hacky
         # `modelify()` doesn't assume you want to save every generated model
         # object, including foreign relationships. So if the account has not
         # been created before saving the payment, the payment row will have a
@@ -428,11 +430,31 @@ class Payment(SaveDirtyModel):
         return payment
 
 
+class Token(TimeStampedModel):
+    """Tokens are returned from successful Recurly.js submissions as a way to
+    look up transaction details. This is an alternate to Recur.ly push
+    notifications."""
+
+    TYPE_CHOICES = (
+        ('subscription', 'Subscription'),
+        ('billing_info', 'Billing Info'),
+        ('invoice', 'Invoice'),
+    )
+
+    account = models.ForeignKey(Account, blank=True, null=True, related_name="tokens")
+    token = models.CharField(max_length=40, unique=True)
+    cls = models.CharField(max_length=12, choices=TYPE_CHOICES)
+    identifier = models.CharField(max_length=40)
+    # TODO: (IW) The Recurly client doesn't give access to the raw xml, add it?
+    xml = models.TextField(blank=True, null=True)
+
+
 # Connect model signal handlers
 
 post_save.connect(handlers.account_post_save, sender=Account, dispatch_uid="account_post_save")
 post_save.connect(handlers.subscription_post_save, sender=Subscription, dispatch_uid="subscription_post_save")
 post_save.connect(handlers.payment_post_save, sender=Payment, dispatch_uid="payment_post_save")
+post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_post_save")
 
 
 ### Helpers ###
@@ -445,7 +467,7 @@ def modelify(resource, model, remove_empty=False, context={}):
     there is no match. Modelify does not save any models back to the database,
     it is left up to the application logic to decide when to do that.'''
 
-    # TODO: Make this smarter, not necessary.
+    # TODO: (IW) Make this smarter, not necessary.
     MODEL_MAP = {
         'user': User,
         'account': Account,
@@ -472,7 +494,7 @@ def modelify(resource, model, remove_empty=False, context={}):
             data[resource.nodename + '_id'] = v
 
         # Recursively replace links to known keys with actual models
-        # TODO: >>> Check that all expected foreign keys are mapped
+        # TODO: (IW) Check that all expected foreign keys are mapped
         if k in MODEL_MAP and k in fields:
             logger.debug("Modelifying nested: %s", k)
 
@@ -498,7 +520,7 @@ def modelify(resource, model, remove_empty=False, context={}):
                 unique_fields[k] = v
 
             if k == "date" or k.endswith("_at"):
-                # TODO: >>> Make sure dates are always in UTC and are tz-aware
+                # TODO: (IW) Make sure dates are always in UTC and are tz-aware
                 pass
 
             # Fields with limited choices should always be lower case
@@ -524,6 +546,6 @@ def modelify(resource, model, remove_empty=False, context={}):
             pass
 
     # This is a new instance
-    # TODO: >>> Auto-save models?
+    # TODO: (IW) Auto-save models?
     logger.debug("Returning new %s object", model)
     return model(**update)

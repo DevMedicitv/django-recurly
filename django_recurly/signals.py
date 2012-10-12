@@ -28,37 +28,43 @@ payment_created = Signal(providing_args=('payment'))
 # Fired when a payment is modified
 payment_updated = Signal(providing_args=('payment'))
 
+# Fired when a Recurly.js success token of type 'subscription' is created
+subscription_token_created = Signal(providing_args=('token', 'account'))
+# Fired when a Recurly.js success token of type 'billing_info' is created
+billing_info_token_created = Signal(providing_args=('token', 'account'))
+# Fired when a Recurly.js success token of type 'invoice' is created
+invoice_token_created = Signal(providing_args=('token', 'account'))
 
 ## Push notifications from Recurly ##
 
 # Accounts
 new_account_notification = Signal(
-        providing_args=('account','xml','type',))
+        providing_args=('account', 'xml', 'type',))
 canceled_account_notification = Signal(
-        providing_args=('account','xml','type',))
+        providing_args=('account', 'xml', 'type',))
 billing_info_updated_notification = Signal(
-        providing_args=('account','xml','type',))
+        providing_args=('account', 'xml', 'type',))
 reactivated_account_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 
 # Subscriptions
 new_subscription_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 updated_subscription_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 expired_subscription_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 canceled_subscription_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 renewed_subscription_notification = Signal(
-        providing_args=('account','subscription','xml','type',))
+        providing_args=('account', 'subscription', 'xml', 'type',))
 
 # Payments
 successful_payment_notification = Signal(
-        providing_args=('account','transaction','xml','type',))
+        providing_args=('account', 'transaction', 'xml', 'type',))
 failed_payment_notification = Signal(
-        providing_args=('account','transaction','xml','type',))
+        providing_args=('account', 'transaction', 'xml', 'type',))
 successful_refund_notification = Signal(
-        providing_args=('account','transaction','xml','type',))
+        providing_args=('account', 'transaction', 'xml', 'type',))
 void_payment_notification = Signal(
-        providing_args=('account','transaction','xml','type',))
+        providing_args=('account', 'transaction', 'xml', 'type',))
