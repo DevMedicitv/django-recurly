@@ -78,6 +78,8 @@ class SaveDirtyModel(models.Model):
             super(SaveDirtyModel, self).save(*args, **kwargs)
             self._previous_state = self._original_state
             self._original_state = self._as_dict()
+        else:
+            logger.debug("Skipping save for %s (pk: %s) because it hasn't changed.", self.__class__.__name__, self.pk or "None")
 
 
 class Account(SaveDirtyModel, TimeStampedModel):
@@ -164,10 +166,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
             return None
 
     def close(self):
-        return self.get_account().delete()
+        self.get_account().delete()
 
     def reopen(self):
-        return self.get_account().reopen()
+        recurly_account = self.get_account()
+        recurly_account.reopen()
 
     @classmethod
     def get_active(class_, user):
@@ -198,7 +201,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         else:
             recurly_subscription = recurly.Subscription.get(kwargs.get("subscription").uuid)
             subscription = modelify(recurly_subscription, Subscription)
-            subscription.xml = kwargs.get('xml')
+            subscription.xml = recurly_subscription.as_log_output(full=True)
 
             subscription.save()
 
@@ -257,8 +260,11 @@ class Subscription(SaveDirtyModel):
             return False
 
     def get_pending_changes(self):
+        if self.xml is None:
+            return None
+
         try:
-            return recurly.objects_for_push_notification(self.xml).subscription.pending_subscription
+            return recurly.Subscription().from_element(self.xml).pending_subscription
         except Exception as e:
             logger.debug("Failed to get pending changes: %s", e)
             return None
@@ -309,8 +315,10 @@ class Subscription(SaveDirtyModel):
         for k, v in kwargs.iteritems():
             setattr(recurly_subscription, k, v)
         recurly_subscription.timeframe = timeframe
-
         recurly_subscription.save()
+
+        self.xml = recurly_subscription.as_log_output(full=True)
+        self.save()
 
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current
@@ -345,8 +353,16 @@ class Subscription(SaveDirtyModel):
             recurly_subscription = recurly.Subscription.get(uuid)
 
         subscription = modelify(recurly_subscription, Subscription)
+        subscription.xml = recurly_subscription.as_log_output(full=True)
 
         # TODO: (IW) Hacky
+        # `modelify()` doesn't assume you want to save every generated model
+        # object, including foreign relationships. So if the account has not
+        # been created before saving the subscription, the subscription row will
+        # have a null value for `account_id` (and the account will not be
+        # saved). Also, simply saving `payment.account` first isn't enough
+        # because Django doesn't automatically set `payment.account_id` to the
+        # generated pk, even though `payment.account.pk` *does* get set.
         if subscription.account.is_dirty():
             subscription.account.save()
             subscription.account_id = subscription.account.pk
@@ -393,18 +409,12 @@ class Payment(SaveDirtyModel):
             recurly_transaction = recurly.Transaction.get(uuid)
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
+        payment.xml = recurly_transaction.as_log_output(full=True)
 
         if payment.invoice_id is None:
             payment.invoice_id = recurly_transaction.invoice().uuid
 
         # TODO: (IW) Hacky
-        # `modelify()` doesn't assume you want to save every generated model
-        # object, including foreign relationships. So if the account has not
-        # been created before saving the payment, the payment row will have a
-        # null value for `account_id` (and the account will not be saved). Also,
-        # simply saving `payment.account` first isn't enough because Django
-        # doesn't automatically set `payment.account_id` to the generated pk,
-        # even though `payment.account.pk` *does* get set.
         if payment.account.is_dirty():
             payment.account.save()
             payment.account_id = payment.account.pk
@@ -419,7 +429,8 @@ class Payment(SaveDirtyModel):
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
         payment.invoice_id = recurly_transaction.invoice().uuid
-        payment.xml = kwargs.get('xml')
+        # payment.xml = kwargs.get('xml')
+        payment.xml = recurly_transaction.as_log_output(full=True)
 
         if payment.account.is_dirty():
             payment.account.save()
@@ -445,7 +456,6 @@ class Token(TimeStampedModel):
     token = models.CharField(max_length=40, unique=True)
     cls = models.CharField(max_length=12, choices=TYPE_CHOICES)
     identifier = models.CharField(max_length=40)
-    # TODO: (IW) The Recurly client doesn't give access to the raw xml, add it?
     xml = models.TextField(blank=True, null=True)
 
 
@@ -459,6 +469,8 @@ post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_po
 
 ### Helpers ###
 
+# TODO: (IW) Add a method on a model base class so this can be used to refresh
+# instances
 def modelify(resource, model, remove_empty=False, context={}):
     '''Modelify handles the dirty work of converting Recurly Resource objects to
     Django model instances, including resolving any additional Resource objects

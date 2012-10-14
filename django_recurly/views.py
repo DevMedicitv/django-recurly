@@ -35,23 +35,26 @@ def push_notifications(request):
 @require_POST
 def success_token(request):
     recurly_token = request.POST.get("recurly_token")
-    account = get_object_or_404(models.Account.active, user=request.user)
-
-    token = models.Token(token=recurly_token, account=account)
+    token = models.Token(token=recurly_token)
 
     try:
         result = recurly.js.fetch(recurly_token)
     except Exception as e:
         logger.warning("Failed to fetch details for success token '%s': %s", recurly_token, e)
+        token.account = get_object_or_404(models.Account.active, user=request.user)
         token.save()
         return HttpResponse()
 
-    token.cls = result.nodename
-    if result.nodename == 'billing_info':
-        token.identifier = result.account().account_code
-        signal = signals.billing_info_token_created
+    # Update the associated Account
+    account = models.Account.sync(recurly_account=result.account())
+    account.save()
 
-        models.Account.sync(account_code=token.identifier)
+    token.account = account
+    token.cls = result.nodename
+
+    if result.nodename == 'billing_info':
+        token.identifier = token.account.account_code
+        signal = signals.billing_info_token_created
     elif result.nodename == 'subscription':
         token.identifier = result.uuid
         signal = signals.subscription_token_created
@@ -63,9 +66,7 @@ def success_token(request):
 
         models.Payment.sync(uuid=token.identifier)
 
-    # TODO: (IW) The Recurly client doesn't actually provide access to the raw
-    # xml, so the xml field isn't storing anything useful. Add it?
-    token.xml = result.as_log_output()
+    token.xml = result.as_log_output(full=True)
     token.save()
 
     signal.send(sender=recurly, token=token, account=account)
