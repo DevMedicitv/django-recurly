@@ -36,7 +36,7 @@ class AccountModelTest(BaseTest):
         self.assertSignal("account_opened")
         self.assertNoSignal("account_closed")
 
-    def test_handle_notification_updating_cancelled(self):
+    def test_handle_notification_updating_canceled(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         Account.handle_notification(data)
 
@@ -60,7 +60,7 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 200)
 
-        # Account was 'cancelled', but is still technically open until is expires
+        # Account was 'canceled', but is still technically open until is expires
         self.assertNoSignal("account_opened")
         self.assertNoSignal("account_closed")
 

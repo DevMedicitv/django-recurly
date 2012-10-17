@@ -1,18 +1,18 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
 from django.utils import timezone
+import re
 
 from django_recurly import recurly
-
 # Do these here to ensure the handlers get hooked up
 from django_recurly import handlers
 from django.db.models.signals import post_save
 
 import logging
 logger = logging.getLogger(__name__)
-
 
 __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 
@@ -28,7 +28,7 @@ class CurrentSubscriptionManager(models.Manager):
 
 
 class SaveDirtyModel(models.Model):
-    """ Save only when new or modified. """
+    """Save only when new or modified."""
 
     SMART_SAVE_FORCE = False
     SMART_SAVE_IGNORE_FIELDS = ()
@@ -82,15 +82,20 @@ class SaveDirtyModel(models.Model):
             logger.debug("Skipping save for %s (pk: %s) because it hasn't changed.", self.__class__.__name__, self.pk or "None")
 
 
+EMAIL_RE = re.compile(r"[^@]+@[^@]+\.[^@]+")
+
+
 class Account(SaveDirtyModel, TimeStampedModel):
+    USER_ACCOUNT_CODE_FIELD_LOOKUP = settings['RECURLY_ACCOUNT_CODE_FIELD_LOOKUP'] if hasattr(settings, 'RECURLY_ACCOUNT_CODE_FIELD_LOOKUP') else 'pk'
+
     ACCOUNT_STATES = (
-        ("active", "Active"),         # Active and everything is fine
+        ("active", "Active"),         # Active account (but may not have billing info)
         ("closed", "Closed"),         # Account has been closed
     )
 
     user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
-    account_code = models.CharField(max_length=32, unique=True)
-    username = models.CharField(max_length=200, blank=False, null=False)
+    account_code = models.CharField(max_length=32, unique=True, null=False)
+    username = models.CharField(max_length=200)
     email = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -109,17 +114,33 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.user is None:
             try:
-                # Associate the account with a user
-                self.user = User.objects.get(username=self.username)
+                # Associate the account with a user using defined lookup
+                fargs = {self.USER_ACCOUNT_CODE_FIELD_LOOKUP: self.account_code}
+                self.user = User.objects.get(**fargs)
             except User.DoesNotExist:
-                # It's possible that a user may not exist locally (closed account)
-                logger.debug("Could not find user for Recurly account (account_code: '%s') having username '%s'", self.account_code, self.username)
-                pass
+                # Fallback to email address (the Recur.ly default)
+                if EMAIL_RE.match(self.account_code):
+                    try:
+                        self.user = User.objects.get(email=self.account_code)
+                    except User.DoesNotExist:
+                        pass
+
+        if self.user is None:
+            # It's possible that a user may not exist locally (e.g. closed account)
+            logger.debug("Could not find user for Recurly account " \
+                "(account_code: '%s') having username '%s'", \
+                self.account_code, self.username)
 
         super(Account, self).save(*args, **kwargs)
 
     def is_active(self):
         return self.state == 'active'
+
+    def has_subscription(self, plan_code=None):
+        if plan_code is not None:
+            return Subscription.current.filter(account=self, plan_code=plan_code).count() > 0
+        else:
+            return Subscription.current.filter(account=self).count() > 0
 
     def get_subscriptions(self, plan_code=None):
         """Get current (i.e. not 'expired') subscriptions for this Account. If
@@ -127,13 +148,10 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         NOTE: An account may have multiple subscriptions of the same `plan_code`.
         """
-        try:
-            if plan_code is not None:
-                return Subscription.current.filter(account=self, plan_code=plan_code)
-            else:
-                return Subscription.current.filter(account=self)
-        except Subscription.DoesNotExist:
-            return None
+        if plan_code is not None:
+            return Subscription.current.filter(account=self, plan_code=plan_code)
+        else:
+            return Subscription.current.filter(account=self)
 
     def get_subscription(self, plan_code=None):
         """Get current subscription of type `plan_code` for this Account.
@@ -327,7 +345,7 @@ class Subscription(SaveDirtyModel):
         recurly_subscription.cancel()
 
     def reactivate(self):
-        """Reactivate the cancelled subscription so it renews at the end of the
+        """Reactivate the canceled subscription so it renews at the end of the
         current billing cycle"""
         recurly_subscription = recurly.Subscription.get(self.uuid)
         recurly_subscription.reactivate()
