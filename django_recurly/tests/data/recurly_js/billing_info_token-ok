@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<billing_info href="https://api.recurly.com/v2/accounts/verena@test.com/billing_info" type="credit_card">
+  <account href="https://api.recurly.com/v2/accounts/verena@test.com" />
+  <first_name>Verena</first_name>
+  <last_name>Test</last_name>
+  <company nil="nil" />
+  <address1 nil="nil" />
+  <address2 nil="nil" />
+  <city nil="nil" />
+  <state nil="nil" />
+  <zip nil="nil" />
+  <country nil="nil" />
+  <phone nil="nil" />
+  <vat_number nil="nil" />
+  <ip_address>1.2.3.4</ip_address>
+  <ip_address_country>US</ip_address_country>
+  <card_type>Visa</card_type>
+  <year type="integer">2013</year>
+  <month type="integer">5</month>
+  <first_six>411111</first_six>
+  <last_four>1111</last_four>
+</billing_info>

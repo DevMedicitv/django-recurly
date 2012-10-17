@@ -200,7 +200,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             subscription = None
         else:
             recurly_subscription = recurly.Subscription.get(kwargs.get("subscription").uuid)
-            subscription = modelify(recurly_subscription, Subscription)
+            subscription = modelify(recurly_subscription, Subscription, context={'account': account})
             subscription.xml = recurly_subscription.as_log_output(full=True)
 
             subscription.save()
@@ -500,6 +500,9 @@ def modelify(resource, model, remove_empty=False, context={}):
         logger.debug("Nope, not a resource: %s (expected %s)", resource, model)
         pass
 
+    if not isinstance(data, dict):
+        raise TypeError("Cannot modelify non-dict '%s' (%s)" % (data, data.__class__.__name__))
+
     for k, v in data.items():
         # Expand 'uuid' to work with payment notifications and transaction API queries
         if k == 'uuid' and hasattr(resource, 'nodename') and not hasattr(data, resource.nodename + '_id'):
@@ -510,16 +513,20 @@ def modelify(resource, model, remove_empty=False, context={}):
         if k in MODEL_MAP and k in fields:
             logger.debug("Modelifying nested: %s", k)
 
-            if isinstance(v, basestring):
-                try:
-                    v = resource.link(k)
-                except AttributeError:
-                    pass
+            if k in context:
+                logger.debug("Using provided context object for: %s", k)
+                data[k] = context[k]
+            else:
+                if isinstance(v, basestring):
+                    try:
+                        v = resource.link(k)
+                    except AttributeError:
+                        pass
 
-            if callable(v):
-                v = v()
+                if callable(v):
+                    v = v()
 
-            data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty)
+                data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty)
 
     update = {}
     unique_fields = {}

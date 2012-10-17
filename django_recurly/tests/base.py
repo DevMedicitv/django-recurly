@@ -11,11 +11,15 @@ from django_recurly.conf import HTTP_AUTHENTICATION
 from django_recurly import signals
 from django_recurly.models import *
 
+from mock import patch, Mock
+
+
 class BaseTest(TestCase):
     def setUp(self):
         super(BaseTest, self).setUp()
         self._signals = set([])
         self._setUpSignals()
+        self.setUpMocks()
         self.setUpData()
 
         self.user = User.objects.create(username="verena", email="moo@cow.com")
@@ -51,7 +55,11 @@ class BaseTest(TestCase):
     def assertNoSignal(self, signal):
         self.assertFalse(signal in self._signals, "Signal '%s' was sent" % signal)
 
+    def setUpMocks(self):
+        pass
+
     def setUpData(self):
+        # Push Notifications
         xml_dir = os.path.abspath(os.path.dirname(__file__)) + "/data/push_notifications/*/*"
         xml_files = glob.glob(xml_dir)
 
@@ -65,12 +73,24 @@ class BaseTest(TestCase):
 
             self.push_notifications[name] = xml
 
+        # Resources
+        xml_dir = os.path.abspath(os.path.dirname(__file__)) + "/data/resources/*"
+        xml_files = glob.glob(xml_dir)
+
+        self.resources = {}
+        for xml_file in xml_files:
+            f = open(xml_file, "r")
+            xml = f.read()
+            f.close()
+
+            name = xml_file.split("/")[-1]
+
+            self.resources[name] = xml
+
     def parse_xml(self, xml):
         from django_recurly import recurly
 
-        recurly.parse_notification(xml)
-
-        return recurly.response()
+        return recurly.objects_for_push_notification(xml)
 
 
 class RequestFactory(Client):
@@ -93,4 +113,3 @@ class RequestFactory(Client):
         environ.update(self.defaults)
         environ.update(request)
         return WSGIRequest(environ)
-

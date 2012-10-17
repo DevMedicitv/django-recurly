@@ -28,6 +28,7 @@ def update(sender, **kwargs):
 
 
 def payment(sender, **kwargs):
+    """Update a payment and account"""
     from django_recurly import models
     models.Payment.handle_notification(**kwargs)
 

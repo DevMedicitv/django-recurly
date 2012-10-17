@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subscription href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3">
+  <account href="https://api.recurly.com/v2/accounts/1"/>
+  <plan href="https://api.recurly.com/v2/plans/gold">
+    <plan_code>gold</plan_code>
+    <name>Gold plan</name>
+  </plan>
+  <uuid>8047cb4fd5f874b14d713d785436ebd3</uuid>
+  <state>active</state>
+  <unit_amount_in_cents type="integer">800</unit_amount_in_cents>
+  <currency>EUR</currency>
+  <quantity type="integer">1</quantity>
+  <activated_at type="datetime">2011-05-27T07:00:00Z</activated_at>
+  <canceled_at nil="nil"></canceled_at>
+  <expires_at nil="nil"></expires_at>
+  <current_period_started_at type="datetime">2011-06-27T07:00:00Z</current_period_started_at>
+  <current_period_ends_at type="datetime">2010-07-27T07:00:00Z</current_period_ends_at>
+  <trial_started_at nil="nil"></trial_started_at>
+  <trial_ends_at nil="nil"></trial_ends_at>
+  <subscription_add_ons type="array">
+  </subscription_add_ons>
+  <a name="cancel" href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/cancel" method="put"/>
+  <a name="terminate" href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/terminate" method="put"/>
+  <a name="postpone" href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/postpone" method="put"/>
+</subscription>

@@ -6,6 +6,9 @@ from django.test import TestCase
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
+from mock import patch, Mock
+
+
 class AccountModelTest(BaseTest):
 
     def test_handle_notification_creating(self):
@@ -15,7 +18,7 @@ class AccountModelTest(BaseTest):
         self.assertEqual(Account.objects.count(), 1)
         self.assertEqual(Subscription.objects.count(), 1)
 
-        # Lets be through here
+        # Lets be thorough here
         self.assertEqual(account.user.username, "verena")
         self.assertEqual(account.first_name, "Verena")
         self.assertEqual(account.company_name, "Company, Inc.")
@@ -28,7 +31,7 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.state, "active")
         self.assertEqual(subscription.quantity, 2)
         self.assertEqual(subscription.total_amount_in_cents, 2000)
-        self.assertEqual(subscription.activated_at, datetime.datetime(2009, 11, 22, 21, 10, 38)) # Phew, its in UTC now :)
+        self.assertEqual(subscription.activated_at, datetime.datetime(2009, 11, 22, 21, 10, 38))  # Phew, its in UTC now :)
 
         self.assertSignal("account_opened")
         self.assertNoSignal("account_closed")
@@ -114,7 +117,7 @@ class AccountModelTest(BaseTest):
         self.assertEqual(subscription.quantity, 1)
         self.assertEqual(subscription.total_amount_in_cents, 700)
 
-        self.assertEqual(subscription.activated_at, datetime.datetime(2011, 9, 14, 19, 14, 14)) # Phew, its in UTC now :)
+        self.assertEqual(subscription.activated_at, datetime.datetime(2011, 9, 14, 19, 14, 14))
 
         # The subscription was created as 'expired' right away, so no signals
         self.assertNoSignal("account_opened")
@@ -141,11 +144,16 @@ class AccountModelTest(BaseTest):
         self.assertNoSignal("account_closed")
 
     def test_get_current(self):
-        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        from django_recurly import recurly
+        recurly.Account.get = Mock(return_value=recurly.Account.from_element(self.resources["account-ok"]))
+        recurly.Subscription.get = Mock(return_value=recurly.Subscription.from_element(self.resources["subscription-ok"]))
 
-        account = Account.get_current(self.user)
+        data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
+        account, subscription = Account.handle_notification(**data)
+        print(account, subscription)
+
         self.assertEqual(account.user.username, "verena")
+
 
 class SubscriptionModelTest(BaseTest):
 
@@ -188,7 +196,7 @@ class PaymentModelTest(BaseTest):
         self.assertEqual(payment.invoice_id, "ffc64d71d4b5404e93f13aac9c63bxxx")
         self.assertEqual(payment.action, "purchase")
 
-        self.assertEqual(payment.date, datetime.datetime(2009, 11, 22, 21, 10, 38)) # Phew, its in UTC now :)
+        self.assertEqual(payment.date, datetime.datetime(2009, 11, 22, 21, 10, 38))
         self.assertEqual(payment.amount_in_cents, 1000)
         self.assertEqual(payment.status, "success")
         self.assertEqual(payment.message, "Bogus Gateway: Forced success")
@@ -246,13 +254,3 @@ class PaymentModelTest(BaseTest):
         self.assertEqual(payment.amount_in_cents, 1000)
         self.assertEqual(payment.status, "declined")
         self.assertEqual(payment.message, "This transaction has been declined")
-
-
-
-
-
-
-
-
-
-

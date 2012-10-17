@@ -20,6 +20,7 @@ RECURLY_HTTP_AUTHENTICATION = "1234567890abcdefghijklmnop:abcdefghijklmnop098765
 # change this down the road then all your subscription dates will skew.
 # The sane thing to do here is to keep this as UTC and handle the
 # timezone conversion in your display logic.
+USE_TZ = True
 TIME_ZONE = "UTC"
 
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))

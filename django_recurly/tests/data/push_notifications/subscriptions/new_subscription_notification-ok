@@ -14,6 +14,7 @@
       <name>Bronze Plan</name>
       <version type="integer">2</version>
     </plan>
+    <uuid>8047cb4fd5f874b14d713d785436ebd3</uuid>
     <state>active</state>
     <quantity type="integer">2</quantity>
     <total_amount_in_cents type="integer">2000</total_amount_in_cents>
