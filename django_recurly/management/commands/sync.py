@@ -3,8 +3,7 @@ import sys
 from django.core.management.base import BaseCommand
 from optparse import make_option
 
-from django_recurly.utils import dump
-from django_recurly import recurly
+from django_recurly.utils import dump, recurly
 from django_recurly.models import Account, Subscription, Payment
 
 

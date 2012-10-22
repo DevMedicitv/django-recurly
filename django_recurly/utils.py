@@ -11,9 +11,10 @@ from copy import deepcopy
 
 from django.shortcuts import redirect
 from django_recurly.conf import SUBDOMAIN
-from django_recurly import recurly
-
+import recurly
 import logging
+
+
 logger = logging.getLogger(__name__)
 
 

@@ -88,7 +88,7 @@ class BaseTest(TestCase):
             self.resources[name] = xml
 
     def parse_xml(self, xml):
-        from django_recurly import recurly
+        from django_recurly.utils import recurly
 
         return recurly.objects_for_push_notification(xml)
 

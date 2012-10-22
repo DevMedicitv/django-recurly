@@ -3,7 +3,7 @@
 from django import template
 from django.template import Library, Node, Variable, loader
 
-from django_recurly import recurly
+from django_recurly.utils import recurly
 from django_recurly.models import Account
 from django_recurly.helpers.recurlyjs import get_config, get_subscription_form, get_billing_info_update_form
 

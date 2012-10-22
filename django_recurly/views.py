@@ -6,8 +6,8 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 
 from .decorators import recurly_basic_authentication
-from .utils import safe_redirect
-from . import recurly, models, signals
+from .utils import safe_redirect, recurly
+from . import models, signals
 
 import logging
 

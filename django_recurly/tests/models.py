@@ -144,7 +144,7 @@ class AccountModelTest(BaseTest):
         self.assertNoSignal("account_closed")
 
     def test_get_current(self):
-        from django_recurly import recurly
+        from django_recurly.utils import recurly
         recurly.Account.get = Mock(return_value=recurly.Account.from_element(self.resources["account-ok"]))
         recurly.Subscription.get = Mock(return_value=recurly.Subscription.from_element(self.resources["subscription-ok"]))
 
