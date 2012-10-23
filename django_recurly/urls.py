@@ -1,6 +1,6 @@
 from django.conf.urls.defaults import *
 from django_recurly.views import push_notifications, success_token, \
-    change_plan, account
+    change_plan, account, invoice
 
 urlpatterns = patterns("",
     url(r"^notification/$", push_notifications, name="notification"),

@@ -1,9 +1,7 @@
 """Helpers for working with Recurly's recurly.js packge"""
 from django.template.loader import render_to_string
-
 from django_recurly.conf import SUBDOMAIN, DEFAULT_CURRENCY
-from django_recurly.utils import dump
-from django_recurly import recurly
+from django_recurly.utils import recurly, dump
 
 
 def get_signature(obj):

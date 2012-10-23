@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from django.conf import settings
-from django_recurly import recurly
+import recurly
 
 API_KEY = getattr(settings, 'RECURLY_API_KEY', None)
 SUBDOMAIN = getattr(settings, 'RECURLY_SUBDOMAIN', None)
