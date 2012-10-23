@@ -6,7 +6,7 @@ from django_extensions.db.models import TimeStampedModel
 from django.utils import timezone
 import re
 
-from django_recurly import recurly
+from django_recurly.utils import recurly
 # Do these here to ensure the handlers get hooked up
 from django_recurly import handlers
 from django.db.models.signals import post_save
