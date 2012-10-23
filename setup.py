@@ -8,15 +8,14 @@ setup(
     license='BSD',
     packages=find_packages(),
     version=__version__,
-    url="https://github.com/impressiver/django-recurly",
+    url="https://github.com/sprintly/django-recurly",
     author="Ian White",
     author_email="ian@sprint.ly",
     description="Django integration for Recurly, a subscription billing service.",
 
-    # install_requires=[
-    #     "iso8601",
-    #     "recurly"
-    # ],
+    install_requires=[
+        "recurly"
+    ],
 
     include_package_data=True,
 )

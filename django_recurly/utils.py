@@ -2,11 +2,9 @@ import urllib
 import urlparse
 import random
 import string
-import iso8601
 import json
 import re
 from django.core.serializers.json import DjangoJSONEncoder
-from datetime import datetime
 from copy import deepcopy
 
 from django.shortcuts import redirect

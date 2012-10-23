@@ -1,6 +1,7 @@
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, \
+    HttpResponseForbidden, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
@@ -90,7 +91,7 @@ def change_plan(request):
 
 @login_required
 def account(request):
-    account = models.Account.get_current(request.user)
+    account = get_object_or_404(models.Account.active, user=request.user)
     subscriptions = account.get_current_subscriptions()
     plans = models.Subscription.getPlans()
 
@@ -101,3 +102,18 @@ def account(request):
     }
 
     return render_to_response("django_recurly/account.html", c, RequestContext(request))
+
+
+@login_required
+def invoice(request, uuid):
+    account = get_object_or_404(models.Account.active, user=request.user)
+    invoice = recurly.Invoice.get(uuid).as_pdf()
+
+    if invoice.account_code != account.account_code:
+        raise HttpResponseForbidden("You are not authorized to view this page.")
+
+    response = HttpResponse(mimetype='application/pdf')
+    # response['Content-Disposition'] = 'attachment; filename="invoice.pdf"'
+    response.write(invoice)
+
+    return response
