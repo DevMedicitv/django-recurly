@@ -81,6 +81,9 @@ class SaveDirtyModel(models.Model):
         else:
             logger.debug("Skipping save for %s (pk: %s) because it hasn't changed.", self.__class__.__name__, self.pk or "None")
 
+    class Meta:
+        abstract = True
+
 
 EMAIL_RE = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
@@ -114,11 +117,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def save(self, *args, **kwargs):
         if self.user is None:
             try:
-                # Associate the account with a user using defined lookup
+                # Associate the account with a user-defined lookup
                 fargs = {self.USER_ACCOUNT_CODE_FIELD_LOOKUP: self.account_code}
                 self.user = User.objects.get(**fargs)
-            except User.DoesNotExist:
-                # Fallback to email address (the Recur.ly default)
+            except:
+                # Fallback to email address (the Recurly default)
                 if EMAIL_RE.match(self.account_code):
                     try:
                         self.user = User.objects.get(email=self.account_code)
@@ -461,7 +464,7 @@ class Payment(SaveDirtyModel):
 
 class Token(TimeStampedModel):
     """Tokens are returned from successful Recurly.js submissions as a way to
-    look up transaction details. This is an alternate to Recur.ly push
+    look up transaction details. This is an alternate to Recurly push
     notifications."""
 
     TYPE_CHOICES = (

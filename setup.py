@@ -13,8 +13,11 @@ setup(
     author_email="ian@sprint.ly",
     description="Django integration for Recurly, a subscription billing service.",
 
+    dependency_links = [
+        'https://github.com/sprintly/recurly-client-python/tarball/master#egg=recurly',
+    ],
     install_requires=[
-        "recurly"
+        "recurly",
     ],
 
     include_package_data=True,
