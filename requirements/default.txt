@@ -1,2 +1,2 @@
 django>=1.4.1
-recurly>=2.1.4
+-e git://github.com/sprintly/recurly-client-python.git#egg=recurly

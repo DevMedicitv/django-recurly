@@ -4,12 +4,15 @@ from django.db.models import Q
 from django.contrib.auth.models import User
 from django_extensions.db.models import TimeStampedModel
 from django.utils import timezone
-import re
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
+from django_recurly import conf
 from django_recurly.utils import recurly
 # Do these here to ensure the handlers get hooked up
 from django_recurly import handlers
 from django.db.models.signals import post_save
+import importlib
 
 import logging
 logger = logging.getLogger(__name__)
@@ -45,7 +48,7 @@ class SaveDirtyModel(models.Model):
         for field in self._meta.fields:  # m2m changes do not require a save
             if field.name in self.SMART_SAVE_IGNORE_FIELDS:
                 continue
-            field_name = '%s_id' % field.name if field.rel else field.name
+            field_name = ('%s_id' % field.name) if field.rel else field.name
             yield (field.name, getattr(self, field_name))
 
     def _as_dict(self):
@@ -85,11 +88,23 @@ class SaveDirtyModel(models.Model):
         abstract = True
 
 
-EMAIL_RE = re.compile(r"[^@]+@[^@]+\.[^@]+")
-
-
 class Account(SaveDirtyModel, TimeStampedModel):
-    USER_ACCOUNT_CODE_FIELD_LOOKUP = settings['RECURLY_ACCOUNT_CODE_FIELD_LOOKUP'] if hasattr(settings, 'RECURLY_ACCOUNT_CODE_FIELD_LOOKUP') else 'pk'
+    # Configurable function used to match a new Recurly account with a Django
+    # User model. Custom functions may accept 'account_code' and 'account' as
+    # kwargs. It can be overridden in the Django settings file by setting
+    # 'RECURLY_ACCOUNT_CODE_TO_USER'.
+    def account_code_to_user(account_code, account):
+        return User.objects.get(pk=account_code)
+
+    RECURLY_ACCOUNT_CODE_TO_USER = account_code_to_user
+    if conf.RECURLY_ACCOUNT_CODE_TO_USER:
+        import_parts = conf.RECURLY_ACCOUNT_CODE_TO_USER.rsplit('.', 1)
+        mod = importlib.import_module(import_parts[0])
+        try:
+            RECURLY_ACCOUNT_CODE_TO_USER = getattr(mod, import_parts[1])
+        except Exception as e:
+            logger.warning("User function failed to load: %s", e)
+            pass
 
     ACCOUNT_STATES = (
         ("active", "Active"),         # Active account (but may not have billing info)
@@ -118,21 +133,32 @@ class Account(SaveDirtyModel, TimeStampedModel):
         if self.user is None:
             try:
                 # Associate the account with a user-defined lookup
-                fargs = {self.USER_ACCOUNT_CODE_FIELD_LOOKUP: self.account_code}
-                self.user = User.objects.get(**fargs)
-            except:
+                self.user = RECURLY_ACCOUNT_CODE_TO_USER(
+                    account_code=self.account_code, account=self)
+            except Exception as e:
                 # Fallback to email address (the Recurly default)
-                if EMAIL_RE.match(self.account_code):
-                    try:
-                        self.user = User.objects.get(email=self.account_code)
-                    except User.DoesNotExist:
-                        pass
+                logger.warning("User lookup failed for account_code '%s'." \
+                    "Falling back to User.email: %s", self.account_code, e)
+                try:
+                    validate_email(self.account_code)
+                    self.user = User.objects.get(email=self.account_code)
+                    return True
+                except (ValidationError, User.DoesNotExist):
+                    pass
 
         if self.user is None:
-            # It's possible that a user may not exist locally (e.g. closed account)
+            # It's possible that a user does not exist locally (e.g. user closed
+            # account in app, but account still exists in Recurly)
             logger.debug("Could not find user for Recurly account " \
                 "(account_code: '%s') having username '%s'", \
                 self.account_code, self.username)
+
+        # Update Recurly account
+        if kwargs.pop('remote', True):
+            recurly_account = self.get_account()
+            for attr, value in self.dirty_fields().iteritems():
+                setattr(recurly_account, attr, value['new'])
+            recurly_account.save()
 
         super(Account, self).save(*args, **kwargs)
 
@@ -186,12 +212,48 @@ class Account(SaveDirtyModel, TimeStampedModel):
         except AttributeError:
             return None
 
+    def update_billing_info(self, billing_info):
+        if isinstance(billing_info, dict):
+            billing_info = recurly.BillingInfo(**billing_info)
+        recurly_account = self.get_account().update_billing_info(billing_info)
+
+        self.sync(recurly_account)
+
     def close(self):
-        self.get_account().delete()
+        recurly_account = self.get_account().delete()
+
+        self.sync(recurly_account)
 
     def reopen(self):
         recurly_account = self.get_account()
         recurly_account.reopen()
+
+        self.sync(recurly_account)
+
+    def subscribe(self, **kwargs):
+        recurly_subscription = recurly.Subscription(**kwargs_sub)
+        self.get_account().subscribe(recurly_subscription)
+
+        Subscription.sync(recurly_subscription=recurly_subscription)
+
+    def sync(self, recurly_account):
+        try:
+            data = recurly_account.to_dict()
+        except AttributeError:
+            logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s", self.pk, recurly_account)
+            raise
+
+        # Update fields
+        for k, v in data.items():
+            if not v or not hasattr(self, k):
+                continue
+
+            if v and getattr(self, k).choices:
+                v = v.lower()
+
+            setattr(self, k, v)
+
+        self.save(remote=False)
 
     @classmethod
     def get_active(class_, user):
@@ -204,8 +266,19 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         account = modelify(recurly_account, class_)
 
-        account.save()
+        account.save(remote=False)
         return account
+
+    @classmethod
+    def create(class_, **kwargs):
+        # Make sure billing_info is a Recurly BillingInfo resource
+        billing_info = kwargs.pop('billing_info', {})
+        if len(billing_info) and isinstance(billing_info, dict):
+            kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
+        recurly_account = recurly.Account(**kwargs)
+        recurly_account.save()
+
+        return class_.sync(recurly_account=recurly_account)
 
     @classmethod
     def handle_notification(class_, **kwargs):
@@ -224,7 +297,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             subscription = modelify(recurly_subscription, Subscription, context={'account': account})
             subscription.xml = recurly_subscription.as_log_output(full=True)
 
-            subscription.save()
+            subscription.save(remote=False)
 
         return account, subscription
 
@@ -260,6 +333,16 @@ class Subscription(SaveDirtyModel):
         ordering = ["-id"]
         get_latest_by = "id"
 
+    def save(self, *args, **kwargs):
+        # Update Recurly subscription
+        if kwargs.pop('remote', True):
+            recurly_subscription = self.get_subscription()
+            for attr, value in self.dirty_fields().iteritems():
+                setattr(recurly_subscription, attr, value['new'])
+            recurly_subscription.save()
+
+        super(Subscription, self).save(*args, **kwargs)
+
     def is_current(self):
         """Is this subscription current (i.e. not 'expired')
 
@@ -279,6 +362,10 @@ class Subscription(SaveDirtyModel):
             return True
         else:
             return False
+
+    def get_subscription(self):
+        # TODO: (IW) Cache/store subscription object
+        return recurly.Subscription.get(self.uuid)
 
     def get_pending_changes(self):
         if self.xml is None:
@@ -331,27 +418,30 @@ class Subscription(SaveDirtyModel):
             logger.debug("Nothing to change for subscription %d", self.pk)
             return
 
-        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription = self.get_subscription()
 
         for k, v in kwargs.iteritems():
             setattr(recurly_subscription, k, v)
         recurly_subscription.timeframe = timeframe
         recurly_subscription.save()
 
-        self.xml = recurly_subscription.as_log_output(full=True)
-        self.save()
+        self.sync(recurly_subscription)
 
     def cancel(self):
         """Cancel the subscription, it will expire at the end of the current
         billing cycle"""
-        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription = self.get_subscription()
         recurly_subscription.cancel()
+
+        self.sync(recurly_subscription)
 
     def reactivate(self):
         """Reactivate the canceled subscription so it renews at the end of the
         current billing cycle"""
-        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription = self.get_subscription()
         recurly_subscription.reactivate()
+
+        self.sync(recurly_subscription)
 
     def terminate(self, refund="none"):
         """Terminate the subscription
@@ -361,8 +451,30 @@ class Subscription(SaveDirtyModel):
             - "partial" : Give a prorated refund
             - "full" : Provide a full refund of the most recent charge
         """
-        recurly_subscription = recurly.Subscription.get(self.uuid)
+        recurly_subscription = self.get_subscription()
         recurly_subscription.terminate(refund=refund)
+
+        self.sync(recurly_subscription)
+
+    def sync(self, recurly_subscription):
+        try:
+            data = recurly_subscription.to_dict()
+        except AttributeError:
+            logger.debug("Can't sync Subscription %s, arg is not a Recurly Resource: %s", self.pk, recurly_subscription)
+            raise
+
+        # Update fields
+        for k, v in data.items():
+            if not v or not hasattr(self, k):
+                continue
+
+            if v and getattr(self, k).choices:
+                v = v.lower()
+
+            setattr(self, k, v)
+
+        self.xml = recurly_subscription.as_log_output(full=True)
+        self.save(remote=False)
 
     @classmethod
     def get_plans(class_):
@@ -385,11 +497,18 @@ class Subscription(SaveDirtyModel):
         # because Django doesn't automatically set `payment.account_id` to the
         # generated pk, even though `payment.account.pk` *does* get set.
         if subscription.account.is_dirty():
-            subscription.account.save()
+            subscription.account.save(remote=False)
             subscription.account_id = subscription.account.pk
 
-        subscription.save()
+        subscription.save(remote=False)
         return subscription
+
+    @classmethod
+    def create(class_, **kwargs):
+        recurly_subscription = recurly.Subscription(**kwargs)
+        recurly_subscription.save()
+
+        return class_.sync(recurly_subscription=recurly_subscription)
 
 
 class Payment(SaveDirtyModel):
@@ -437,10 +556,10 @@ class Payment(SaveDirtyModel):
 
         # TODO: (IW) Hacky
         if payment.account.is_dirty():
-            payment.account.save()
+            payment.account.save(remote=False)
             payment.account_id = payment.account.pk
 
-        payment.save()
+        payment.save(remote=False)
         return payment
 
     @classmethod
@@ -454,10 +573,10 @@ class Payment(SaveDirtyModel):
         payment.xml = recurly_transaction.as_log_output(full=True)
 
         if payment.account.is_dirty():
-            payment.account.save()
+            payment.account.save(remote=False)
             payment.account_id = payment.account.pk
 
-        payment.save()
+        payment.save(remote=False)
 
         return payment
 

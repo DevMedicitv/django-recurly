@@ -3,6 +3,9 @@
 from django.conf import settings
 import recurly
 
+
+### Recurly API Settings ###
+
 API_KEY = getattr(settings, 'RECURLY_API_KEY', None)
 SUBDOMAIN = getattr(settings, 'RECURLY_SUBDOMAIN', None)
 
@@ -18,6 +21,9 @@ HTTP_AUTHENTICATION = getattr(settings, 'RECURLY_HTTP_AUTHENTICATION', None)
 # You probably don't need to mess with these, but just in case.
 BASE_URI = getattr(settings, 'RECURLY_BASE_URI', None)
 
+
+### Django settings ###
+
 # For the love of all things holy, please keep this set to a sensible
 # (i.e. unchanging / non daylight saving) timezone. This determines the
 # timezone  in which django_recurly stores dates in the DB, so if you
@@ -26,7 +32,13 @@ BASE_URI = getattr(settings, 'RECURLY_BASE_URI', None)
 # timezone conversion in your display logic.
 TIME_ZONE = getattr(settings, 'TIME_ZONE', 'UTC')
 
-# Configure Recurly
+### Django-Recurly settings ###
+
+RECURLY_ACCOUNT_CODE_TO_USER = getattr(settings, 'RECURLY_ACCOUNT_CODE_TO_USER',
+    None)
+
+
+# Configure the Recurly client
 recurly.API_KEY = API_KEY
 
 if JS_PRIVATE_KEY is not None:
