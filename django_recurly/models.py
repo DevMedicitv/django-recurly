@@ -588,15 +588,14 @@ class Payment(SaveDirtyModel):
             payment.account.save(remote=False)
             payment.account_id = payment.account.pk
 
-        payment.save(remote=False)
-
+        payment.save()
         return payment
 
 
 class Token(TimeStampedModel):
     """Tokens are returned from successful Recurly.js submissions as a way to
-    look up transaction details. This is an alternate to Recurly push
-    notifications."""
+    look up transaction details. This is an alternative to waiting for Recurly
+    push notifications."""
 
     TYPE_CHOICES = (
         ('subscription', 'Subscription'),
