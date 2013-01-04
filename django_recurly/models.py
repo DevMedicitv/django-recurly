@@ -20,6 +20,24 @@ logger = logging.getLogger(__name__)
 __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 
 
+# Configurable function used to match a new Recurly account with a Django
+# User model. Custom functions may accept 'account_code' and 'account' as
+# kwargs. It can be overridden in the Django settings file by setting
+# 'RECURLY_ACCOUNT_CODE_TO_USER'.
+def account_code_to_user(account_code, account):
+    return User.objects.get(pk=account_code)
+
+RECURLY_ACCOUNT_CODE_TO_USER = account_code_to_user
+if conf.RECURLY_ACCOUNT_CODE_TO_USER:
+    import_parts = conf.RECURLY_ACCOUNT_CODE_TO_USER.rsplit('.', 1)
+    mod = importlib.import_module(import_parts[0])
+    try:
+        RECURLY_ACCOUNT_CODE_TO_USER = getattr(mod, import_parts[1])
+    except Exception as e:
+        logger.warning("User function failed to load: %s", e)
+        pass
+
+
 class ActiveAccountManager(models.Manager):
     def get_query_set(self):
         return super(ActiveAccountManager, self).get_query_set().filter(state="active")
@@ -89,23 +107,6 @@ class SaveDirtyModel(models.Model):
 
 
 class Account(SaveDirtyModel, TimeStampedModel):
-    # Configurable function used to match a new Recurly account with a Django
-    # User model. Custom functions may accept 'account_code' and 'account' as
-    # kwargs. It can be overridden in the Django settings file by setting
-    # 'RECURLY_ACCOUNT_CODE_TO_USER'.
-    def account_code_to_user(account_code, account):
-        return User.objects.get(pk=account_code)
-
-    RECURLY_ACCOUNT_CODE_TO_USER = account_code_to_user
-    if conf.RECURLY_ACCOUNT_CODE_TO_USER:
-        import_parts = conf.RECURLY_ACCOUNT_CODE_TO_USER.rsplit('.', 1)
-        mod = importlib.import_module(import_parts[0])
-        try:
-            RECURLY_ACCOUNT_CODE_TO_USER = getattr(mod, import_parts[1])
-        except Exception as e:
-            logger.warning("User function failed to load: %s", e)
-            pass
-
     ACCOUNT_STATES = (
         ("active", "Active"),         # Active account (but may not have billing info)
         ("closed", "Closed"),         # Account has been closed
