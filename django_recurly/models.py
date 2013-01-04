@@ -216,7 +216,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def update_billing_info(self, billing_info):
         if isinstance(billing_info, dict):
             billing_info = recurly.BillingInfo(**billing_info)
-        recurly_account = self.get_account().update_billing_info(billing_info)
+        recurly_account = self.get_account()
+        recurly_account.update_billing_info(billing_info)
 
         self.sync(recurly_account)
 
@@ -235,7 +236,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         recurly_subscription = recurly.Subscription(**kwargs_sub)
         self.get_account().subscribe(recurly_subscription)
 
-        Subscription.sync(recurly_subscription=recurly_subscription)
+        Subscription.sync_subscription(recurly_subscription=recurly_subscription)
 
     def sync(self, recurly_account):
         try:
@@ -244,12 +245,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
             logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s", self.pk, recurly_account)
             raise
 
+        fields_by_name = dict((field.name, field) for field in self._meta.fields)
+
         # Update fields
         for k, v in data.items():
             if not v or not hasattr(self, k):
                 continue
 
-            if v and getattr(self, k).choices:
+            if v and fields_by_name[k].choices:
                 v = v.lower()
 
             setattr(self, k, v)
@@ -261,7 +264,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return class_.active.filter(user=user).latest()
 
     @classmethod
-    def sync(class_, recurly_account=None, account_code=None):
+    def sync_account(class_, recurly_account=None, account_code=None):
         if recurly_account is None:
             recurly_account = recurly.Account.get(account_code)
 
@@ -279,7 +282,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         recurly_account = recurly.Account(**kwargs)
         recurly_account.save()
 
-        return class_.sync(recurly_account=recurly_account)
+        return class_.sync_account(recurly_account=recurly_account)
 
     @classmethod
     def handle_notification(class_, **kwargs):
@@ -288,7 +291,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         # First get the up-to-date account details directly from Recurly and
         # sync local record (update existing, or create new)
-        account = class_.sync(account_code=kwargs.get("account").account_code)
+        account = class_.sync_account(account_code=kwargs.get("account").account_code)
 
         # Now do the same with the subscription (if there is one)
         if not kwargs.get("subscription"):
@@ -464,12 +467,20 @@ class Subscription(SaveDirtyModel):
             logger.debug("Can't sync Subscription %s, arg is not a Recurly Resource: %s", self.pk, recurly_subscription)
             raise
 
+        fields_by_name = dict((field.name, field) for field in self._meta.fields)
+
         # Update fields
         for k, v in data.items():
             if not v or not hasattr(self, k):
                 continue
 
-            if v and getattr(self, k).choices:
+            # Skip relationships
+            # TODO: (IW) Remove this once 'account' is taken out of the
+            # recurly-client-python 'attributes' list.
+            if k == 'account':
+                continue
+
+            if v and fields_by_name[k].choices:
                 v = v.lower()
 
             setattr(self, k, v)
@@ -482,7 +493,7 @@ class Subscription(SaveDirtyModel):
         return [plan.name for plan in recurly.Plan.all()]
 
     @classmethod
-    def sync(class_, recurly_subscription=None, uuid=None):
+    def sync_subscription(class_, recurly_subscription=None, uuid=None):
         if recurly_subscription is None:
             recurly_subscription = recurly.Subscription.get(uuid)
 
@@ -509,7 +520,7 @@ class Subscription(SaveDirtyModel):
         recurly_subscription = recurly.Subscription(**kwargs)
         recurly_subscription.save()
 
-        return class_.sync(recurly_subscription=recurly_subscription)
+        return class_.sync_subscription(recurly_subscription=recurly_subscription)
 
 
 class Payment(SaveDirtyModel):
@@ -545,7 +556,7 @@ class Payment(SaveDirtyModel):
         return recurly.Invoice.get(self.invoice_id)
 
     @classmethod
-    def sync(class_, recurly_transaction=None, uuid=None):
+    def sync_payment(class_, recurly_transaction=None, uuid=None):
         if recurly_transaction is None:
             recurly_transaction = recurly.Transaction.get(uuid)
 

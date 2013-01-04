@@ -48,7 +48,7 @@ class Command(BaseCommand):
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_account in page:
-                    account = Account.sync(recurly_account=recurly_account)
+                    account = Account.sync_account(recurly_account=recurly_account)
                 try:
                     page = page.next_page()
                     i += 1
@@ -56,7 +56,7 @@ class Command(BaseCommand):
                     page = None
 
         elif options['account']:
-            Account.sync(account_code=options['account'])
+            Account.sync_account(account_code=options['account'])
 
         elif options['subscriptions']:
             # Sync all 'live' subscriptions
@@ -65,7 +65,7 @@ class Command(BaseCommand):
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_subscription in page:
-                    subscription = Subscription.sync(recurly_subscription=recurly_subscription)
+                    subscription = Subscription.sync_subscription(recurly_subscription=recurly_subscription)
                 try:
                     page = page.next_page()
                     i += 1
@@ -78,7 +78,7 @@ class Command(BaseCommand):
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_subscription in page:
-                    subscription = Subscription.sync(recurly_subscription=recurly_subscription)
+                    subscription = Subscription.sync_subscription(recurly_subscription=recurly_subscription)
                 try:
                     page = page.next_page()
                     i += 1
@@ -95,14 +95,14 @@ class Command(BaseCommand):
                 for recurly_transaction in page:
                     if recurly_transaction.action == 'verify':
                         continue
-                    payment = Payment.sync(recurly_transaction=recurly_transaction)
+                    payment = Payment.sync_payment(recurly_transaction=recurly_transaction)
                 try:
                     page = page.next_page()
                     i += 1
                 except recurly.resource.PageError:
                     page = None
         elif options['payment']:
-            Payment.sync(uuid=options['payment'])
+            Payment.sync_payment(uuid=options['payment'])
 
         else:
             self.print_help(None, None)
