@@ -47,7 +47,7 @@ def success_token(request):
         return HttpResponse()
 
     # Update the associated Account
-    account = models.Account.sync(recurly_account=result.account())
+    account = models.Account.sync_account(recurly_account=result.account())
     account.save()
 
     token.account = account
@@ -60,12 +60,12 @@ def success_token(request):
         token.identifier = result.uuid
         signal = signals.subscription_token_created
 
-        models.Subscription.sync(uuid=token.identifier)
+        models.Subscription.sync_subscription(uuid=token.identifier)
     elif result.nodename == 'invoice':
         token.identifier = result.uuid
         signal = signals.invoice_token_created
 
-        models.Payment.sync(uuid=token.identifier)
+        models.Payment.sync_payment(uuid=token.identifier)
 
     token.xml = result.as_log_output(full=True)
     token.save()

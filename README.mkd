@@ -1,0 +1,1 @@
+Install from local directory: `pip install -e path/to/django-recurly/ -U`
