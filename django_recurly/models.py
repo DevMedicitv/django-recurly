@@ -84,7 +84,6 @@ class SaveDirtyModel(models.Model):
 
 EMAIL_RE = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
-
 class Account(SaveDirtyModel, TimeStampedModel):
     USER_ACCOUNT_CODE_FIELD_LOOKUP = settings['RECURLY_ACCOUNT_CODE_FIELD_LOOKUP'] if hasattr(settings, 'RECURLY_ACCOUNT_CODE_FIELD_LOOKUP') else 'pk'
 
@@ -137,10 +136,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return self.state == 'active'
 
     def has_subscription(self, plan_code=None):
-        if plan_code is not None:
-            return Subscription.current.filter(account=self, plan_code=plan_code).count() > 0
-        else:
-            return Subscription.current.filter(account=self).count() > 0
+        return self.get_subscriptions(plan_code=plan_code).exists()
 
     def get_subscriptions(self, plan_code=None):
         """Get current (i.e. not 'expired') subscriptions for this Account. If
@@ -159,10 +155,12 @@ class Account(SaveDirtyModel, TimeStampedModel):
         An exception will be raised if the account has more than one non-expired
         subscription of the specified type.
         """
-        if plan_code is not None:
-            return Subscription.current.get(account=self, plan_code=plan_code)
-        else:
-            return Subscription.current.get(account=self)
+        subscriptions = self.get_subscriptions(plan_code=plan_code)
+        if len(subscriptions) > 1:
+            raise Subscription.MultipleObjectsReturned()
+        elif len(subscriptions) == 0:
+            raise Subscription.DoesNotExist()
+        return subscriptions[0]
 
     def get_account(self):
         # TODO: (IW) Cache/store account object
