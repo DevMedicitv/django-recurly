@@ -232,7 +232,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         self.sync(recurly_account)
 
     def close(self):
-        recurly_account = self.get_account().delete()
+        recurly_account = self.get_account()
+        recurly_account.delete()
 
         self.sync(recurly_account)
 
@@ -452,6 +453,9 @@ class Subscription(SaveDirtyModel):
 
         super(Subscription, self).save(*args, **kwargs)
 
+    def is_canceled(self):
+        return self.state == 'canceled'
+
     def is_current(self):
         """Is this subscription current (i.e. not 'expired')
 
@@ -540,7 +544,8 @@ class Subscription(SaveDirtyModel):
         """Cancel the subscription, it will expire at the end of the current
         billing cycle"""
         recurly_subscription = self.get_subscription()
-        recurly_subscription.cancel()
+        if recurly_subscription.state != 'canceled':
+            recurly_subscription.cancel()
 
         self.sync(recurly_subscription)
 

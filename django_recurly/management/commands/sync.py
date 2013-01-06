@@ -42,8 +42,10 @@ class Command(BaseCommand):
     help = "Update local Django-Recurly data by querying Recurly. Recurly is assumed to be the point of authority, and this command will overwrite any local discprepancies (unless '--dry-run' is specified)."
 
     def handle(self, *args, **options):
-
+        something_chosen = False
         if options['accounts']:
+            something_chosen = True
+
             i = 1
             page = recurly.Account.all()
             while page is not None:
@@ -62,10 +64,14 @@ class Command(BaseCommand):
                 except recurly.resource.PageError:
                     page = None
 
-        elif options['account']:
+        if options['account']:
+            something_chosen = True
+
             Account.sync_account(account_code=options['account'])
 
-        elif options['subscriptions']:
+        if options['subscriptions']:
+            something_chosen = True
+
             # Sync all 'live' subscriptions
             i = 1
             page = recurly.Subscription.all_live()
@@ -91,10 +97,15 @@ class Command(BaseCommand):
                     i += 1
                 except recurly.resource.PageError:
                     page = None
-        elif options['subscription']:
+
+        if options['subscription']:
+            something_chosen = True
+
             Subscription.sync(uuid=options['subscription'])
 
-        elif options['payments']:
+        if options['payments']:
+            something_chosen = True
+
             i = 1
             page = recurly.Transaction.all()
             while page is not None:
@@ -108,9 +119,12 @@ class Command(BaseCommand):
                     i += 1
                 except recurly.resource.PageError:
                     page = None
-        elif options['payment']:
+
+        if options['payment']:
+            something_chosen = True
+
             Payment.sync_payment(uuid=options['payment'])
 
-        else:
+        if not something_chosen:
             self.print_help(None, None)
             sys.exit(1)
