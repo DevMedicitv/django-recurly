@@ -202,6 +202,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
         except AttributeError:
             return None
 
+    def has_billing_info(self):
+        return self.get_billing_info() is not None
+
     def get_invoices(self):
         return self.get_account().invoices
 
