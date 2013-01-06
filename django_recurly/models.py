@@ -437,7 +437,8 @@ class Subscription(SaveDirtyModel):
         """Cancel the subscription, it will expire at the end of the current
         billing cycle"""
         recurly_subscription = self.get_subscription()
-        recurly_subscription.cancel()
+        if recurly_subscription.state != 'canceled':
+            recurly_subscription.cancel()
 
         self.sync(recurly_subscription)
 
