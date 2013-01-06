@@ -14,6 +14,11 @@ account_opened = Signal(providing_args=('account'))
 # Fired when a user's active account is closed
 account_closed = Signal(providing_args=('account'))
 
+# Fired when a new account is created
+billing_info_created = Signal(providing_args=('billing_info'))
+# Fired when an account changes
+billing_info_updated = Signal(providing_args=('billing_info'))
+
 # Fired when a new subscription is created
 subscription_created = Signal(providing_args=('subscription'))
 # Fired when a subscription changes

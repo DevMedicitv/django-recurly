@@ -14,17 +14,48 @@ class Migration(SchemaMigration):
             ('created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
             ('modified', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now, blank=True)),
             ('user', self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='recurly_account', null=True, on_delete=models.SET_NULL, to=orm['auth.User'])),
-            ('account_code', self.gf('django.db.models.fields.CharField')(unique=True, max_length=32)),
-            ('username', self.gf('django.db.models.fields.CharField')(max_length=200)),
-            ('email', self.gf('django.db.models.fields.CharField')(max_length=100)),
-            ('first_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
-            ('last_name', self.gf('django.db.models.fields.CharField')(max_length=100)),
-            ('company_name', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
+            ('account_code', self.gf('django.db.models.fields.CharField')(unique=True, max_length=50)),
+            ('username', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('email', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
+            ('first_name', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('last_name', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('company_name', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('accept_language', self.gf('django.db.models.fields.CharField')(max_length=2, null=True, blank=True)),
             ('state', self.gf('django.db.models.fields.CharField')(default='active', max_length=20)),
             ('hosted_login_token', self.gf('django.db.models.fields.CharField')(max_length=32, null=True, blank=True)),
             ('created_at', self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True)),
         ))
         db.send_create_signal('django_recurly', ['Account'])
+
+        # Adding model 'BillingInfo'
+        db.create_table('django_recurly_billinginfo', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('account', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['django_recurly.Account'], unique=True)),
+            ('first_name', self.gf('django.db.models.fields.CharField')(max_length=50)),
+            ('last_name', self.gf('django.db.models.fields.CharField')(max_length=50)),
+            ('type', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('company_name', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('address1', self.gf('django.db.models.fields.CharField')(max_length=200, null=True, blank=True)),
+            ('address2', self.gf('django.db.models.fields.CharField')(max_length=200, null=True, blank=True)),
+            ('city', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
+            ('state', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('zip', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('country', self.gf('django.db.models.fields.CharField')(max_length=2, null=True, blank=True)),
+            ('phone', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('vat_number', self.gf('django.db.models.fields.CharField')(max_length=16, null=True, blank=True)),
+            ('ip_address', self.gf('django.db.models.fields.GenericIPAddressField')(max_length=39, null=True, blank=True)),
+            ('ip_address_country', self.gf('django.db.models.fields.CharField')(max_length=2, null=True, blank=True)),
+            ('card_type', self.gf('django.db.models.fields.CharField')(max_length=50, null=True, blank=True)),
+            ('month', self.gf('django.db.models.fields.IntegerField')(max_length=2, null=True, blank=True)),
+            ('year', self.gf('django.db.models.fields.IntegerField')(max_length=4, null=True, blank=True)),
+            ('first_six', self.gf('django.db.models.fields.IntegerField')(max_length=6, null=True, blank=True)),
+            ('last_four', self.gf('django.db.models.fields.IntegerField')(max_length=4, null=True, blank=True)),
+            ('start_month', self.gf('django.db.models.fields.IntegerField')(max_length=2, null=True, blank=True)),
+            ('start_year', self.gf('django.db.models.fields.IntegerField')(max_length=4, null=True, blank=True)),
+            ('issue_number', self.gf('django.db.models.fields.IntegerField')(max_length=4, null=True, blank=True)),
+            ('billing_agreement_id', self.gf('django.db.models.fields.CharField')(max_length=100, null=True, blank=True)),
+        ))
+        db.send_create_signal('django_recurly', ['BillingInfo'])
 
         # Adding model 'Subscription'
         db.create_table('django_recurly_subscription', (
@@ -81,6 +112,9 @@ class Migration(SchemaMigration):
         # Deleting model 'Account'
         db.delete_table('django_recurly_account')
 
+        # Deleting model 'BillingInfo'
+        db.delete_table('django_recurly_billinginfo')
+
         # Deleting model 'Subscription'
         db.delete_table('django_recurly_subscription')
 
@@ -130,19 +164,48 @@ class Migration(SchemaMigration):
         },
         'django_recurly.account': {
             'Meta': {'ordering': "['-id']", 'object_name': 'Account'},
-            'account_code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '32'}),
-            'company_name': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'accept_language': ('django.db.models.fields.CharField', [], {'max_length': '2', 'null': 'True', 'blank': 'True'}),
+            'account_code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '50'}),
+            'company_name': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
             'created_at': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
-            'email': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'first_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
+            'email': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'first_name': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'hosted_login_token': ('django.db.models.fields.CharField', [], {'max_length': '32', 'null': 'True', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'last_name': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
+            'last_name': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
             'modified': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now', 'blank': 'True'}),
             'state': ('django.db.models.fields.CharField', [], {'default': "'active'", 'max_length': '20'}),
             'user': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'recurly_account'", 'null': 'True', 'on_delete': 'models.SET_NULL', 'to': "orm['auth.User']"}),
-            'username': ('django.db.models.fields.CharField', [], {'max_length': '200'})
+            'username': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'})
+        },
+        'django_recurly.billinginfo': {
+            'Meta': {'object_name': 'BillingInfo'},
+            'account': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['django_recurly.Account']", 'unique': 'True'}),
+            'address1': ('django.db.models.fields.CharField', [], {'max_length': '200', 'null': 'True', 'blank': 'True'}),
+            'address2': ('django.db.models.fields.CharField', [], {'max_length': '200', 'null': 'True', 'blank': 'True'}),
+            'billing_agreement_id': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'card_type': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'city': ('django.db.models.fields.CharField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'company_name': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'country': ('django.db.models.fields.CharField', [], {'max_length': '2', 'null': 'True', 'blank': 'True'}),
+            'first_name': ('django.db.models.fields.CharField', [], {'max_length': '50'}),
+            'first_six': ('django.db.models.fields.IntegerField', [], {'max_length': '6', 'null': 'True', 'blank': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'ip_address': ('django.db.models.fields.GenericIPAddressField', [], {'max_length': '39', 'null': 'True', 'blank': 'True'}),
+            'ip_address_country': ('django.db.models.fields.CharField', [], {'max_length': '2', 'null': 'True', 'blank': 'True'}),
+            'issue_number': ('django.db.models.fields.IntegerField', [], {'max_length': '4', 'null': 'True', 'blank': 'True'}),
+            'last_four': ('django.db.models.fields.IntegerField', [], {'max_length': '4', 'null': 'True', 'blank': 'True'}),
+            'last_name': ('django.db.models.fields.CharField', [], {'max_length': '50'}),
+            'month': ('django.db.models.fields.IntegerField', [], {'max_length': '2', 'null': 'True', 'blank': 'True'}),
+            'phone': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'start_month': ('django.db.models.fields.IntegerField', [], {'max_length': '2', 'null': 'True', 'blank': 'True'}),
+            'start_year': ('django.db.models.fields.IntegerField', [], {'max_length': '4', 'null': 'True', 'blank': 'True'}),
+            'state': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'type': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'}),
+            'vat_number': ('django.db.models.fields.CharField', [], {'max_length': '16', 'null': 'True', 'blank': 'True'}),
+            'year': ('django.db.models.fields.IntegerField', [], {'max_length': '4', 'null': 'True', 'blank': 'True'}),
+            'zip': ('django.db.models.fields.CharField', [], {'max_length': '50', 'null': 'True', 'blank': 'True'})
         },
         'django_recurly.payment': {
             'Meta': {'ordering': "['-id']", 'object_name': 'Payment'},

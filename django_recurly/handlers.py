@@ -68,6 +68,11 @@ def account_post_save(sender, instance, created, **kwargs):
     elif not was_active and now_active:
         signals.account_opened.send(sender=sender, account=instance)
 
+def billing_info_post_save(sender, instance, created, **kwargs):
+    if created:
+        signals.billing_info_created.send(sender=sender, billing_info=instance)
+    else:
+        signals.billing_info_updated.send(sender=sender, billing_info=instance)
 
 def subscription_post_save(sender, instance, created, **kwargs):
     if created:

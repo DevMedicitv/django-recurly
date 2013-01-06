@@ -3,8 +3,9 @@ import sys
 from django.core.management.base import BaseCommand
 from optparse import make_option
 
+from django.contrib.auth.models import User
 from django_recurly.utils import dump, recurly
-from django_recurly.models import Account, Subscription, Payment
+from django_recurly.models import Account, BillingInfo, Subscription, Payment
 
 
 class Command(BaseCommand):
@@ -48,7 +49,13 @@ class Command(BaseCommand):
             while page is not None:
                 print("Syncing page %d..." % i)
                 for recurly_account in page:
-                    account = Account.sync_account(recurly_account=recurly_account)
+                    try:
+                        account = Account.sync_account(recurly_account=recurly_account)
+                    except User.DoesNotExist:
+                        print("No user for Recurly account with account_code %s" % recurly_account.account_code)
+
+                    if hasattr(recurly_account, 'billing_info'):
+                        billing_info = BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
                 try:
                     page = page.next_page()
                     i += 1

@@ -113,12 +113,15 @@ class Account(SaveDirtyModel, TimeStampedModel):
     )
 
     user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
-    account_code = models.CharField(max_length=32, unique=True, null=False)
-    username = models.CharField(max_length=200)
-    email = models.CharField(max_length=100)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    company_name = models.CharField(max_length=100, blank=True, null=True)
+
+    account_code = models.CharField(max_length=50, unique=True, null=False)
+    username = models.CharField(max_length=50, blank=True, null=True)
+    email = models.CharField(max_length=100, blank=True, null=True)
+    first_name = models.CharField(max_length=50, blank=True, null=True)
+    last_name = models.CharField(max_length=50, blank=True, null=True)
+    company_name = models.CharField(max_length=50, blank=True, null=True)
+    accept_language = models.CharField(max_length=2, blank=True, null=True)
+
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
@@ -166,6 +169,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def is_active(self):
         return self.state == 'active'
 
+    def has_billing_info(self):
+        return hasattr(self, 'billing_info')
+
     def has_subscription(self, plan_code=None):
         if plan_code is not None:
             return Subscription.current.filter(account=self, plan_code=plan_code).count() > 0
@@ -199,8 +205,10 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return recurly.Account.get(self.account_code)
 
     def get_billing_info(self):
+        raise DeprecationWarning("Use Account.billing_info instead.")
+
         try:
-            return self.get_account().billing_info
+            return self.billing_info
         except AttributeError:
             return None
 
@@ -233,7 +241,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         self.sync(recurly_account)
 
     def subscribe(self, **kwargs):
-        recurly_subscription = recurly.Subscription(**kwargs_sub)
+        recurly_subscription = recurly.Subscription(**kwargs)
         self.get_account().subscribe(recurly_subscription)
 
         Subscription.sync_subscription(recurly_subscription=recurly_subscription)
@@ -250,6 +258,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
         # Update fields
         for k, v in data.items():
             if not v or not hasattr(self, k):
+                continue
+
+            if k == 'billing_info':
                 continue
 
             if v and fields_by_name[k].choices:
@@ -269,6 +280,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
             recurly_account = recurly.Account.get(account_code)
 
         account = modelify(recurly_account, class_)
+
+        if hasattr(account, 'billing_info') and account.billing_info.is_dirty():
+            account.billing_info.save(remote=False)
 
         account.save(remote=False)
         return account
@@ -304,6 +318,91 @@ class Account(SaveDirtyModel, TimeStampedModel):
             subscription.save(remote=False)
 
         return account, subscription
+
+
+class BillingInfo(SaveDirtyModel):
+    BILLING_TYPES = (
+        ("credit_card", "Credit Card"),
+        ("paypal", "PayPal"),
+    )
+
+    account = models.OneToOneField(Account, related_name='billing_info')
+
+    first_name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50)
+
+    type = models.CharField(max_length=50, blank=True, null=True, choices=BILLING_TYPES)
+
+    company_name = models.CharField(max_length=50, blank=True, null=True)
+    address1 = models.CharField(max_length=200, blank=True, null=True)
+    address2 = models.CharField(max_length=200, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=50, blank=True, null=True)
+    zip = models.CharField(max_length=50, blank=True, null=True)
+    country = models.CharField(max_length=2, null=True, blank=True)
+    phone = models.CharField(max_length=50, blank=True, null=True)
+
+    vat_number = models.CharField(max_length=16, blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    ip_address_country = models.CharField(max_length=2, null=True, blank=True)
+
+    card_type = models.CharField(max_length=50, blank=True, null=True)
+    month = models.IntegerField(max_length=2, blank=True, null=True)
+    year = models.IntegerField(max_length=4, blank=True, null=True)
+    first_six = models.IntegerField(max_length=6, blank=True, null=True)
+    last_four = models.IntegerField(max_length=4, blank=True, null=True)
+    start_month = models.IntegerField(max_length=2, blank=True, null=True)
+    start_year = models.IntegerField(max_length=4, blank=True, null=True)
+    issue_number = models.IntegerField(max_length=4, blank=True, null=True)
+
+    # PayPal
+    billing_agreement_id = models.CharField(max_length=100, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        # Update Recurly billing info
+        if kwargs.pop('remote', True):
+            recurly_account = self.account.get_account()
+            billing_infp = recurly_account.get_billing_info()
+            for attr, value in self.dirty_fields().iteritems():
+                setattr(recurly_billing_info, attr, value['new'])
+            account.update_billing_info(billing_info)
+
+        super(BillingInfo, self).save(*args, **kwargs)
+
+    def sync(self, recurly_billing_info):
+        try:
+            data = recurly_billing_info.to_dict()
+        except AttributeError:
+            logger.debug("Can't sync BillingInfo %s, arg is not a Recurly Resource: %s", self.pk, recurly_billing_info)
+            raise
+
+        fields_by_name = dict((field.name, field) for field in self._meta.fields)
+
+        # Update fields
+        for k, v in data.items():
+            if not v or not hasattr(self, k):
+                continue
+
+            if v and fields_by_name[k].choices:
+                v = v.lower()
+
+            setattr(self, k, v)
+
+        self.save(remote=False)
+
+    @classmethod
+    def sync_billing_info(class_, recurly_billing_info=None, account_code=None):
+        if recurly_billing_info is None:
+            recurly_billing_info = recurly.Account.get(account_code).get_billing_info()
+
+        billing_info = modelify(recurly_billing_info, class_)
+
+        if billing_info.account.is_dirty():
+            billing_info.account.save(remote=False)
+            billing_info.account_id = billing_info.account.pk
+
+        billing_info.save(remote=False)
+        return billing_info
 
 
 class Subscription(SaveDirtyModel):
@@ -500,14 +599,16 @@ class Subscription(SaveDirtyModel):
         subscription = modelify(recurly_subscription, Subscription)
         subscription.xml = recurly_subscription.as_log_output(full=True)
 
-        # TODO: (IW) Hacky
+        # TAKE NOTE:
         # `modelify()` doesn't assume you want to save every generated model
-        # object, including foreign relationships. So if the account has not
-        # been created before saving the subscription, the subscription row will
-        # have a null value for `account_id` (and the account will not be
-        # saved). Also, simply saving `payment.account` first isn't enough
-        # because Django doesn't automatically set `payment.account_id` to the
-        # generated pk, even though `payment.account.pk` *does* get set.
+        # object, including foreign relationships. So if this is a subscription
+        # for a new account, and you save the subscription before creating the
+        # account, the subscription will have a null value for `account_id`
+        # (as the account will not have been created yet). Also, simply saving
+        # `payment.account` first isn't enough because Django doesn't
+        # automatically set `payment.account_id` with the newly generated
+        # account pk (note, though, that `payment.account.pk` *will* be set
+        # after calling `payment.account.save()`).
         if subscription.account.is_dirty():
             subscription.account.save(remote=False)
             subscription.account_id = subscription.account.pk
@@ -613,6 +714,7 @@ class Token(TimeStampedModel):
 # Connect model signal handlers
 
 post_save.connect(handlers.account_post_save, sender=Account, dispatch_uid="account_post_save")
+post_save.connect(handlers.billing_info_post_save, sender=BillingInfo, dispatch_uid="billing_info_post_save")
 post_save.connect(handlers.subscription_post_save, sender=Subscription, dispatch_uid="subscription_post_save")
 post_save.connect(handlers.payment_post_save, sender=Payment, dispatch_uid="payment_post_save")
 post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_post_save")
@@ -634,6 +736,7 @@ def modelify(resource, model, remove_empty=False, context={}):
     MODEL_MAP = {
         'user': User,
         'account': Account,
+        'billing_info': BillingInfo,
         'subscription': Subscription,
         'transaction': Payment,
     }
