@@ -223,7 +223,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         self.sync(recurly_account)
 
     def close(self):
-        recurly_account = self.get_account().delete()
+        recurly_account = self.get_account()
+        recurly_account.delete()
 
         self.sync(recurly_account)
 
