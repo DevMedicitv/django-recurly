@@ -349,6 +349,9 @@ class Subscription(SaveDirtyModel):
 
         super(Subscription, self).save(*args, **kwargs)
 
+    def is_canceled(self):
+        return self.state == 'canceled'
+
     def is_current(self):
         """Is this subscription current (i.e. not 'expired')
 
