@@ -169,7 +169,19 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return self.state == 'active'
 
     def has_billing_info(self):
-        return hasattr(self, 'billing_info')
+        try:
+            self.billing_info
+        except BillingInfo.DoesNotExist:
+            return False
+        return True
+
+    def get_billing_info(self):
+        raise DeprecationWarning("Use Account.billing_info instead.")
+
+        try:
+            return self.billing_info
+        except AttributeError:
+            return None
 
     def has_subscription(self, plan_code=None):
         return self.get_subscriptions(plan_code=plan_code).exists()
@@ -201,17 +213,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def get_account(self):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
-
-    def get_billing_info(self):
-        raise DeprecationWarning("Use Account.billing_info instead.")
-
-        try:
-            return self.billing_info
-        except AttributeError:
-            return None
-
-    def has_billing_info(self):
-        return self.get_billing_info() is not None
 
     def get_invoices(self):
         return self.get_account().invoices
@@ -262,7 +263,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
                 continue
 
             if k == 'billing_info':
-                continue
+                billing_info = BillingInfo.sync(recurly_billing_info=billing_info)
+                if not billing_info.is_dirty():
+                    continue
+                billing_info.save(remote=False)
+                v = billing_info
 
             if v and fields_by_name[k].choices:
                 v = v.lower()
@@ -673,7 +678,7 @@ class Payment(SaveDirtyModel):
             payment.account.save(remote=False)
             payment.account_id = payment.account.pk
 
-        payment.save(remote=False)
+        payment.save()
         return payment
 
     @classmethod
