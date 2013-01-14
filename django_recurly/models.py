@@ -297,7 +297,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     @classmethod
     def create(class_, **kwargs):
         # Make sure billing_info is a Recurly BillingInfo resource
-        billing_info = kwargs.pop('billing_info', {})
+        billing_info = kwargs.pop('billing_info', None)
         if len(billing_info) and isinstance(billing_info, dict):
             kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
         recurly_account = recurly.Account(**kwargs)
