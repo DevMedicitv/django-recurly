@@ -55,9 +55,6 @@ class Command(BaseCommand):
                         account = Account.sync_account(recurly_account=recurly_account)
                     except User.DoesNotExist:
                         print("No user for Recurly account with account_code %s" % recurly_account.account_code)
-
-                    if hasattr(recurly_account, 'billing_info'):
-                        billing_info = BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
                 try:
                     page = page.next_page()
                     i += 1

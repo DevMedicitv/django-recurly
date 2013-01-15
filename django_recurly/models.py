@@ -118,7 +118,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     email = models.CharField(max_length=100, blank=True, null=True)
     first_name = models.CharField(max_length=50, blank=True, null=True)
     last_name = models.CharField(max_length=50, blank=True, null=True)
-    company_name = models.CharField(max_length=50, blank=True, null=True)
+    company_name = models.CharField(max_length=50, blank=True, null=True)   # TODO: (IW) Should be 'company' - but not in the Docs, only in the Recurly-Client-Python code ??
     accept_language = models.CharField(max_length=2, blank=True, null=True)
 
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
@@ -229,7 +229,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         recurly_account = self.get_account()
         recurly_account.update_billing_info(billing_info)
 
-        self.sync(recurly_account)
+        BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
 
     def close(self):
         recurly_account = self.get_account()
@@ -253,7 +253,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         try:
             data = recurly_account.to_dict()
         except AttributeError:
-            logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s", self.pk, recurly_account)
+            logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s", self.pk, recurly_account, exc_info=True)
             raise
 
         fields_by_name = dict((field.name, field) for field in self._meta.fields)
@@ -264,11 +264,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
                 continue
 
             if k == 'billing_info':
-                billing_info = BillingInfo.sync(recurly_billing_info=billing_info)
-                if not billing_info.is_dirty():
-                    continue
-                billing_info.save(remote=False)
-                v = billing_info
+                v = BillingInfo.sync_billing_info(recurly_billing_info=v)
 
             if v and fields_by_name[k].choices:
                 v = v.lower()
@@ -399,6 +395,7 @@ class BillingInfo(SaveDirtyModel):
 
     @classmethod
     def sync_billing_info(class_, recurly_billing_info=None, account_code=None):
+        logger.debug("BillingInfo.sync: %s", recurly_billing_info)
         if recurly_billing_info is None:
             recurly_billing_info = recurly.Account.get(account_code).get_billing_info()
 
