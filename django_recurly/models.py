@@ -424,6 +424,7 @@ class Subscription(SaveDirtyModel):
     quantity = models.IntegerField(default=1)
     unit_amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")
+
     activated_at = models.DateTimeField(blank=True, null=True)
     canceled_at = models.DateTimeField(blank=True, null=True)
     expires_at = models.DateTimeField(blank=True, null=True)
@@ -431,6 +432,7 @@ class Subscription(SaveDirtyModel):
     current_period_ends_at = models.DateTimeField(blank=True, null=True)
     trial_started_at = models.DateTimeField(blank=True, null=True)
     trial_ends_at = models.DateTimeField(blank=True, null=True)
+
     xml = models.TextField(blank=True, null=True)
 
     objects = models.Manager()
@@ -634,24 +636,38 @@ class Subscription(SaveDirtyModel):
 
 class Payment(SaveDirtyModel):
     ACTION_CHOICES = (
+        ("authorization", "Authorization"),
         ("purchase", "Purchase"),
-        ("credit", "Credit"),
+        ("refund", "Refund"),
+        # ("credit", "Credit"),                   # Push notifications
     )
 
     STATUS_CHOICES = (
         ("success", "Success"),
-        ("declined", "Declined"),
+        ("failed", "Failed"),
         ("void", "Void"),
+        # ("declined", "Declined"),               # Push notifications
     )
 
-    account = models.ForeignKey(Account, blank=True, null=True)
-    transaction_id = models.CharField(max_length=40, unique=True)
-    invoice_id = models.CharField(max_length=40, blank=True, null=True)
+    SOURCE_CHOICES = (
+        ("transaction", "One-time transaction"),
+        ("subscription", "Subscription"),
+        ("billing_info", "Updated billing info"),
+    )
+
+    account = models.ForeignKey(Account, blank=True, null=True, db_index=True)
+    transaction_id = models.CharField(max_length=40, unique=True, db_index=True)
+    invoice_id = models.CharField(max_length=40, blank=True, null=True, db_index=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in 'cents' (i8n)!
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
-    message = models.CharField(max_length=250)
+    source = models.CharField(max_length=100, choices=SOURCE_CHOICES)
+    amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in 'cents' (i8n)!
     created_at = models.DateTimeField(blank=True, null=True)
+
+    message = models.CharField(max_length=250)  # Only set from push notifications
+
+    reference = models.CharField(max_length=100, blank=True, null=True)
+    details = models.TextField(blank=True, null=True)
     xml = models.TextField(blank=True, null=True)
 
     class Meta:
@@ -685,13 +701,17 @@ class Payment(SaveDirtyModel):
 
     @classmethod
     def handle_notification(class_, **kwargs):
+        # Get latest transaction details from Recurly
         recurly_transaction = recurly.Transaction.get(kwargs.get("transaction").id)
-        # account_code = kwargs.get("account").account_code
 
         payment = modelify(recurly_transaction, class_, remove_empty=True)
         payment.invoice_id = recurly_transaction.invoice().uuid
-        # payment.xml = kwargs.get('xml')
-        payment.xml = recurly_transaction.as_log_output(full=True)
+        # payment.xml = recurly_transaction.as_log_output(full=True)
+
+        # Extra data sent only with notifications
+        notification_transaction = kwargs.get('transaction')
+        payment.message = notification_transaction.message
+        payment.notification_xml = kwargs.get('xml')
 
         if payment.account.is_dirty():
             payment.account.save(remote=False)
