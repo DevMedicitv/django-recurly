@@ -636,7 +636,7 @@ class Subscription(SaveDirtyModel):
 
 class Payment(SaveDirtyModel):
     ACTION_CHOICES = (
-        ("authorization", "Authorization"),
+        ("verify", "Verify"),
         ("purchase", "Purchase"),
         ("refund", "Refund"),
         # ("credit", "Credit"),                   # Push notifications
