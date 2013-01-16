@@ -80,11 +80,10 @@ class Command(BaseCommand):
         if options['payments']:
             something_chosen = True
 
-            for recurly_transaction in recurly.Transaction.all():
-                # NOTE: Recurly says this is 'authorization', but the xml
-                # returns action as 'verify'
-                if recurly_transaction.action == 'verify':
-                    continue
+            for recurly_transaction in recurly.Transaction.all(type='purchase'):
+                payment = Payment.sync_payment(recurly_transaction=recurly_transaction)
+
+            for recurly_transaction in recurly.Transaction.all(type='refund'):
                 payment = Payment.sync_payment(recurly_transaction=recurly_transaction)
 
         if options['payment']:

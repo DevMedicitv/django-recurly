@@ -105,6 +105,7 @@ class SaveDirtyModel(models.Model):
     class Meta:
         abstract = True
 
+
 class Account(SaveDirtyModel, TimeStampedModel):
     ACCOUNT_STATES = (
         ("active", "Active"),         # Active account (but may not have billing info)
@@ -179,7 +180,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         raise DeprecationWarning("Use Account.billing_info instead.")
 
         try:
-            return self.billing_info
+            return self.get_account().billing_info
         except AttributeError:
             return None
 
@@ -283,11 +284,15 @@ class Account(SaveDirtyModel, TimeStampedModel):
             recurly_account = recurly.Account.get(account_code)
 
         account = modelify(recurly_account, class_)
-
-        if hasattr(account, 'billing_info') and account.billing_info.is_dirty():
-            account.billing_info.save(remote=False)
-
         account.save(remote=False)
+
+        try:
+            if account.billing_info.is_dirty():
+                account.billing_info.save(remote=False)
+        except BillingInfo.DoesNotExist:
+            if hasattr(recurly_account, 'billing_info'):
+                BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
+
         return account
 
     @classmethod
@@ -397,11 +402,15 @@ class BillingInfo(SaveDirtyModel):
     def sync_billing_info(class_, recurly_billing_info=None, account_code=None):
         logger.debug("BillingInfo.sync: %s", recurly_billing_info)
         if recurly_billing_info is None:
-            recurly_billing_info = recurly.Account.get(account_code).get_billing_info()
+            try:
+                recurly_billing_info = recurly.Account.get(account_code).billing_info
+            except AttributeError:
+                logger.debug("No billing info available for Recurly account '%s'", account_code)
+                return None
 
-        billing_info = modelify(recurly_billing_info, class_)
+        billing_info = modelify(recurly_billing_info, class_, follow=['account'])
 
-        if billing_info.account.is_dirty():
+        if hasattr(billing_info, 'account') and not billing_info.account.pk:
             billing_info.account.save(remote=False)
             billing_info.account_id = billing_info.account.pk
 
@@ -606,7 +615,7 @@ class Subscription(SaveDirtyModel):
         if recurly_subscription is None:
             recurly_subscription = recurly.Subscription.get(uuid)
 
-        subscription = modelify(recurly_subscription, Subscription)
+        subscription = modelify(recurly_subscription, class_, follow=['account'])
         subscription.xml = recurly_subscription.as_log_output(full=True)
 
         # TAKE NOTE:
@@ -619,9 +628,16 @@ class Subscription(SaveDirtyModel):
         # automatically set `payment.account_id` with the newly generated
         # account pk (note, though, that `payment.account.pk` *will* be set
         # after calling `payment.account.save()`).
-        if subscription.account.is_dirty():
-            subscription.account.save(remote=False)
-            subscription.account_id = subscription.account.pk
+
+        if hasattr(subscription, 'account'):
+        #     # First save the billing info
+        #     if hasattr(subscription.account, 'billing_info') \
+        #         and subscription.account.billing_info.is_dirty():
+        #         subscription.account.billing_info.save(remote=False)
+        #     # Next save the account
+            if not subscription.account.pk:
+                subscription.account.save(remote=False)
+                subscription.account_id = subscription.account.pk
 
         subscription.save(remote=False)
         return subscription
@@ -685,16 +701,22 @@ class Payment(SaveDirtyModel):
         if recurly_transaction is None:
             recurly_transaction = recurly.Transaction.get(uuid)
 
-        payment = modelify(recurly_transaction, class_, remove_empty=True)
+        payment = modelify(recurly_transaction, class_, remove_empty=True, follow=['account'])
         payment.xml = recurly_transaction.as_log_output(full=True)
 
         if payment.invoice_id is None:
             payment.invoice_id = recurly_transaction.invoice().uuid
 
         # TODO: (IW) Hacky
-        if payment.account.is_dirty():
-            payment.account.save(remote=False)
-            payment.account_id = payment.account.pk
+        if hasattr(payment, 'account'):
+            # # Billing info
+            # if hasattr(payment.account, 'billing_info') \
+            #     and payment.account.billing_info.is_dirty():
+            #     payment.account.billing_info.save(remote=False)
+            # Account
+            if not payment.account.pk:
+                payment.account.save(remote=False)
+                payment.account_id = payment.account.pk
 
         payment.save()
         return payment
@@ -713,11 +735,17 @@ class Payment(SaveDirtyModel):
         payment.message = notification_transaction.message
         payment.notification_xml = kwargs.get('xml')
 
-        if payment.account.is_dirty():
-            payment.account.save(remote=False)
-            payment.account_id = payment.account.pk
+        if hasattr(payment, 'account'):
+            # # Billing info
+            # if hasattr(payment.account, 'billing_info') \
+            #     and payment.account.billing_info.is_dirty():
+            #     payment.account.billing_info.save(remote=False)
+            # Account
+            if not payment.account.pk:
+                payment.account.save(remote=False)
+                payment.account_id = payment.account.pk
+                payment.save()
 
-        payment.save()
         return payment
 
 
@@ -752,7 +780,7 @@ post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_po
 
 # TODO: (IW) Add a method on a model base class so this can be used to refresh
 # instances
-def modelify(resource, model, remove_empty=False, context={}):
+def modelify(resource, model, remove_empty=False, follow=[], context={}):
     '''Modelify handles the dirty work of converting Recurly Resource objects to
     Django model instances, including resolving any additional Resource objects
     required to satisfy foreign key relationships. This method will query for
@@ -793,22 +821,28 @@ def modelify(resource, model, remove_empty=False, context={}):
         # Recursively replace links to known keys with actual models
         # TODO: (IW) Check that all expected foreign keys are mapped
         if k in MODEL_MAP and k in fields:
-            logger.debug("Modelifying nested: %s", k)
-
             if k in context:
                 logger.debug("Using provided context object for: %s", k)
                 data[k] = context[k]
-            else:
-                if isinstance(v, basestring):
-                    try:
-                        v = resource.link(k)
-                    except AttributeError:
-                        pass
+            elif not k in follow:
+                logger.debug("Not following linked: %s", k)
+                del data[k]
+                continue
 
-                if callable(v):
-                    v = v()
+            logger.debug("Following linked: %s", k)
+            if isinstance(v, basestring):
+                try:
+                    v = resource.link(k)
+                except AttributeError:
+                    pass
 
-                data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty)
+            if callable(v):
+                v = v()
+
+            logger.debug("Modelifying nested: %s", k)
+            # TODO: (IW) This won't attach foreign keys for reverse lookups
+            # e.g. account has no attribute 'billing_info'
+            data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty, follow=follow, context=context)
 
     update = {}
     unique_fields = {}
@@ -835,18 +869,19 @@ def modelify(resource, model, remove_empty=False, context={}):
     if unique_fields:
         try:
             obj = model.objects.get(**unique_fields)
-            logger.debug("Updating %s", obj)
+        except model.DoesNotExist:
+            logger.debug("No row found matching unique fields '%s'", unique_fields)
+            pass
+        else:
+            logger.debug("Updating %s (%s): %s", obj.__class__.__name__, obj.pk, update)
 
             # Update fields
             for k, v in update.items():
                 setattr(obj, k, v)
 
             return obj
-        except model.DoesNotExist:
-            logger.debug("No row found matching unique fields '%s'", unique_fields)
-            pass
 
     # This is a new instance
     # TODO: (IW) Auto-save models?
-    logger.debug("Returning new %s object", model)
+    logger.debug("Returning new %s object: %s", model.__name__, update)
     return model(**update)
