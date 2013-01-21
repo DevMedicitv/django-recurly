@@ -250,11 +250,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         Subscription.sync_subscription(recurly_subscription=recurly_subscription)
 
-    def sync(self, recurly_account):
+    def sync(self, recurly_account=None):
+        if recurly_account is None:
+            recurly_account = self.get_account()
         try:
             data = recurly_account.to_dict()
         except AttributeError:
-            logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s", self.pk, recurly_account, exc_info=True)
+            logger.debug("Can't sync Account %s, arg is not a Recurly Resource: %s",
+                self.pk, recurly_account, exc_info=True)
             raise
 
         fields_by_name = dict((field.name, field) for field in self._meta.fields)
@@ -265,13 +268,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
                 continue
 
             if k == 'billing_info':
-                v = BillingInfo.sync_billing_info(recurly_billing_info=v)
+                continue
 
             if v and fields_by_name[k].choices:
                 v = v.lower()
 
             setattr(self, k, v)
 
+        BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
         self.save(remote=False)
 
     @classmethod
@@ -291,8 +295,12 @@ class Account(SaveDirtyModel, TimeStampedModel):
             if account.billing_info.is_dirty():
                 account.billing_info.save(remote=False)
         except BillingInfo.DoesNotExist:
-            if hasattr(recurly_account, 'billing_info'):
-                BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
+            try:
+                billing_info = recurly_account.billing_info
+            except:
+                pass
+            else:
+                BillingInfo.sync_billing_info(recurly_billing_info=billing_info)
 
         return account
 
@@ -371,18 +379,22 @@ class BillingInfo(SaveDirtyModel):
         # Update Recurly billing info
         if kwargs.pop('remote', True):
             recurly_account = self.account.get_account()
-            billing_infp = recurly_account.get_billing_info()
+            recurly_billing_info = recurly_account.get_billing_info()
             for attr, value in self.dirty_fields().iteritems():
                 setattr(recurly_billing_info, attr, value['new'])
             account.update_billing_info(billing_info)
 
         super(BillingInfo, self).save(*args, **kwargs)
 
-    def sync(self, recurly_billing_info):
+    def sync(self, recurly_billing_info=None):
+        if recurly_billing_info is None:
+            recurly_account = self.account.get_account()
+            recurly_billing_info = recurly_account.get_billing_info()
         try:
             data = recurly_billing_info.to_dict()
         except AttributeError:
-            logger.debug("Can't sync BillingInfo %s, arg is not a Recurly Resource: %s", self.pk, recurly_billing_info)
+            logger.debug("Can't sync BillingInfo %s, arg is not a Recurly Resource: %s",
+                self.pk, recurly_billing_info)
             raise
 
         fields_by_name = dict((field.name, field) for field in self._meta.fields)
@@ -408,7 +420,7 @@ class BillingInfo(SaveDirtyModel):
                 logger.debug("No billing info available for Recurly account '%s'", account_code)
                 return None
 
-        logger.debug("BillingInfo.sync: %s", recurly_billing_info.account_code)
+        logger.debug("BillingInfo.sync: %s", recurly_billing_info)
         billing_info = modelify(recurly_billing_info, class_, follow=['account'])
 
         if hasattr(billing_info, 'account') and not billing_info.account.pk:
@@ -553,7 +565,7 @@ class Subscription(SaveDirtyModel):
         """Cancel the subscription, it will expire at the end of the current
         billing cycle"""
         recurly_subscription = self.get_subscription()
-        if recurly_subscription.state != 'canceled':
+        if recurly_subscription.state == 'active':
             recurly_subscription.cancel()
 
         self.sync(recurly_subscription)
@@ -562,7 +574,8 @@ class Subscription(SaveDirtyModel):
         """Reactivate the canceled subscription so it renews at the end of the
         current billing cycle"""
         recurly_subscription = self.get_subscription()
-        recurly_subscription.reactivate()
+        if recurly_subscription.state == 'canceled':
+            recurly_subscription.reactivate()
 
         self.sync(recurly_subscription)
 
@@ -579,11 +592,14 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def sync(self, recurly_subscription):
+    def sync(self, recurly_subscription=None):
+        if recurly_subscription is None:
+            recurly_subscription = self.get_subscription()
         try:
             data = recurly_subscription.to_dict()
         except AttributeError:
-            logger.debug("Can't sync Subscription %s, arg is not a Recurly Resource: %s", self.pk, recurly_subscription)
+            logger.debug("Can't sync Subscription %s, arg is not a Recurly Resource: %s",
+                self.pk, recurly_subscription)
             raise
 
         fields_by_name = dict((field.name, field) for field in self._meta.fields)
@@ -632,11 +648,7 @@ class Subscription(SaveDirtyModel):
         # after calling `payment.account.save()`).
 
         if hasattr(subscription, 'account'):
-        #     # First save the billing info
-        #     if hasattr(subscription.account, 'billing_info') \
-        #         and subscription.account.billing_info.is_dirty():
-        #         subscription.account.billing_info.save(remote=False)
-        #     # Next save the account
+            # Save the account
             if not subscription.account.pk:
                 subscription.account.save(remote=False)
                 subscription.account_id = subscription.account.pk
@@ -712,10 +724,6 @@ class Payment(SaveDirtyModel):
 
         # TODO: (IW) Hacky
         if hasattr(payment, 'account'):
-            # # Billing info
-            # if hasattr(payment.account, 'billing_info') \
-            #     and payment.account.billing_info.is_dirty():
-            #     payment.account.billing_info.save(remote=False)
             # Account
             if not payment.account.pk:
                 payment.account.save(remote=False)
@@ -739,10 +747,6 @@ class Payment(SaveDirtyModel):
         payment.notification_xml = kwargs.get('xml')
 
         if hasattr(payment, 'account'):
-            # # Billing info
-            # if hasattr(payment.account, 'billing_info') \
-            #     and payment.account.billing_info.is_dirty():
-            #     payment.account.billing_info.save(remote=False)
             # Account
             if not payment.account.pk:
                 payment.account.save(remote=False)
@@ -873,10 +877,10 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
         try:
             obj = model.objects.get(**unique_fields)
         except model.DoesNotExist:
-            logger.debug("No row found matching unique fields '%s'", unique_fields)
+            logger.debug("No %s row found matching unique fields '%s'", model.__name__, unique_fields)
             pass
         else:
-            logger.debug("Updating %s (%s): %s", obj.__class__.__name__, obj.pk, update)
+            logger.debug("Found existing row for %s (%s)", obj.__class__.__name__, obj.pk)
 
             # Update fields
             for k, v in update.items():
@@ -886,5 +890,5 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
 
     # This is a new instance
     # TODO: (IW) Auto-save models?
-    logger.debug("Returning new %s object: %s", model.__name__, update)
+    logger.debug("Returning new %s object", model.__name__)
     return model(**update)
