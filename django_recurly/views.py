@@ -11,7 +11,6 @@ from .utils import safe_redirect, recurly
 from . import models, signals
 
 import logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -19,7 +18,6 @@ logger = logging.getLogger(__name__)
 @recurly_basic_authentication
 @require_POST
 def push_notifications(request):
-
     xml = request.raw_post_data
     objects = recurly.objects_for_push_notification(xml.strip())
 
@@ -28,8 +26,11 @@ def push_notifications(request):
     except AttributeError:
         return HttpResponseBadRequest("Invalid notification type.")
 
+    logger.debug("Received Recurly push notification (type: '%s', account_code: '%s')",
+        objects['type'], objects['account'].account_code)
+    signals.push_notification.send(sender=recurly, xml=xml, **objects)
     signal.send(sender=recurly, xml=xml, **objects)
-    return HttpResponse()
+    return HttpResponse(status=204)
 
 
 @login_required

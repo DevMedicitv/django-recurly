@@ -42,6 +42,10 @@ invoice_token_created = Signal(providing_args=('token', 'account'))
 
 ## Push notifications from Recurly ##
 
+# Fires any time a push notification is received
+push_notification = Signal(
+        providing_args=('account', 'subscription', 'transaction', 'xml', 'type',))
+
 # Accounts
 new_account_notification = Signal(
         providing_args=('account', 'xml', 'type',))
