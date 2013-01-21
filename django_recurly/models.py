@@ -748,7 +748,7 @@ class Payment(SaveDirtyModel):
 
         if hasattr(payment, 'account'):
             # Account
-            if not payment.account.pk:
+            if pament.account is not None and not payment.account.pk:
                 payment.account.save(remote=False)
                 payment.account_id = payment.account.pk
                 payment.save()
