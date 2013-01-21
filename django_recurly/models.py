@@ -283,6 +283,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         if recurly_account is None:
             recurly_account = recurly.Account.get(account_code)
 
+        logger.debug("Account.sync: %s", recurly_account.account_code)
         account = modelify(recurly_account, class_)
         account.save(remote=False)
 
@@ -400,7 +401,6 @@ class BillingInfo(SaveDirtyModel):
 
     @classmethod
     def sync_billing_info(class_, recurly_billing_info=None, account_code=None):
-        logger.debug("BillingInfo.sync: %s", recurly_billing_info)
         if recurly_billing_info is None:
             try:
                 recurly_billing_info = recurly.Account.get(account_code).billing_info
@@ -408,6 +408,7 @@ class BillingInfo(SaveDirtyModel):
                 logger.debug("No billing info available for Recurly account '%s'", account_code)
                 return None
 
+        logger.debug("BillingInfo.sync: %s", recurly_billing_info.account_code)
         billing_info = modelify(recurly_billing_info, class_, follow=['account'])
 
         if hasattr(billing_info, 'account') and not billing_info.account.pk:
@@ -615,6 +616,7 @@ class Subscription(SaveDirtyModel):
         if recurly_subscription is None:
             recurly_subscription = recurly.Subscription.get(uuid)
 
+        logger.debug("Subscription.sync: %s", recurly_subscription.uuid)
         subscription = modelify(recurly_subscription, class_, follow=['account'])
         subscription.xml = recurly_subscription.as_log_output(full=True)
 
@@ -701,6 +703,7 @@ class Payment(SaveDirtyModel):
         if recurly_transaction is None:
             recurly_transaction = recurly.Transaction.get(uuid)
 
+        logger.debug("Payment.sync: %s", recurly_transaction.uuid)
         payment = modelify(recurly_transaction, class_, remove_empty=True, follow=['account'])
         payment.xml = recurly_transaction.as_log_output(full=True)
 
