@@ -120,7 +120,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     first_name = models.CharField(max_length=50, blank=True, null=True)
     last_name = models.CharField(max_length=50, blank=True, null=True)
     company_name = models.CharField(max_length=50, blank=True, null=True)   # TODO: (IW) Should be 'company' - but not in the Docs, only in the Recurly-Client-Python code ??
-    accept_language = models.CharField(max_length=2, blank=True, null=True)
+    accept_language = models.CharField(max_length=6, blank=True, null=True)
 
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
     hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
@@ -176,14 +176,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
             return False
         return True
 
-    def get_billing_info(self):
-        raise DeprecationWarning("Use Account.billing_info instead.")
-
-        try:
-            return self.get_account().billing_info
-        except AttributeError:
-            return None
-
     def has_subscription(self, plan_code=None):
         return self.get_subscriptions(plan_code=plan_code).exists()
 
@@ -230,7 +222,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         recurly_account = self.get_account()
         recurly_account.update_billing_info(billing_info)
 
-        BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
+        BillingInfo.sync_billing_info(account_code=self.account_code)
 
     def close(self):
         recurly_account = self.get_account()
@@ -274,9 +266,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
                 v = v.lower()
 
             setattr(self, k, v)
-
-        BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
+        # Save account
         self.save(remote=False)
+
+        # Update billing info
+        try:
+            BillingInfo.sync_billing_info(recurly_billing_info=data.billing_info)
+        except AttributeError as e:
+            BillingInfo.sync_billing_info(account_code=self.account_code)
 
     @classmethod
     def get_active(class_, user):
@@ -291,16 +288,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
         account = modelify(recurly_account, class_)
         account.save(remote=False)
 
+        # Update billing info
         try:
-            if account.billing_info.is_dirty():
-                account.billing_info.save(remote=False)
-        except BillingInfo.DoesNotExist:
-            try:
-                billing_info = recurly_account.billing_info
-            except:
-                pass
-            else:
-                BillingInfo.sync_billing_info(recurly_billing_info=billing_info)
+            BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
+        except AttributeError as e:
+            BillingInfo.sync_billing_info(account_code=account.account_code)
 
         return account
 
@@ -308,8 +300,10 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def create(class_, **kwargs):
         # Make sure billing_info is a Recurly BillingInfo resource
         billing_info = kwargs.pop('billing_info', None)
-        if len(billing_info) and isinstance(billing_info, dict):
+        if billing_info and not isinstance(billing_info, recurly.BillingInfo):
+            billing_info = dict(billing_info)
             kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
+
         recurly_account = recurly.Account(**kwargs)
         recurly_account.save()
 
@@ -379,7 +373,7 @@ class BillingInfo(SaveDirtyModel):
         # Update Recurly billing info
         if kwargs.pop('remote', True):
             recurly_account = self.account.get_account()
-            recurly_billing_info = recurly_account.get_billing_info()
+            recurly_billing_info = recurly_account.billing_info
             for attr, value in self.dirty_fields().iteritems():
                 setattr(recurly_billing_info, attr, value['new'])
             account.update_billing_info(billing_info)
@@ -389,7 +383,14 @@ class BillingInfo(SaveDirtyModel):
     def sync(self, recurly_billing_info=None):
         if recurly_billing_info is None:
             recurly_account = self.account.get_account()
-            recurly_billing_info = recurly_account.get_billing_info()
+            try:
+                recurly_billing_info = recurly_account.billing_info
+            except AttributeError as e:
+                logger.debug("No billing info available for Recurly account '%s' " \
+                    "(account_code: '%s').",
+                    self.account_id, self.account.account_code, self.pk)
+                self.delete()
+                return
         try:
             data = recurly_billing_info.to_dict()
         except AttributeError:
@@ -402,6 +403,9 @@ class BillingInfo(SaveDirtyModel):
         # Update fields
         for k, v in data.items():
             if not v or not hasattr(self, k):
+                continue
+
+            if k == 'account':
                 continue
 
             if v and fields_by_name[k].choices:
@@ -417,7 +421,12 @@ class BillingInfo(SaveDirtyModel):
             try:
                 recurly_billing_info = recurly.Account.get(account_code).billing_info
             except AttributeError:
-                logger.debug("No billing info available for Recurly account '%s'", account_code)
+                logger.debug("No billing info available for account_code '%s'",
+                    account_code)
+                try:
+                    BillingInfo.objects.filter(account__account_code=account_code).delete()
+                except BillingInfo.DoesNotExist:
+                    pass
                 return None
 
         logger.debug("BillingInfo.sync: %s", recurly_billing_info)
@@ -729,6 +738,8 @@ class Payment(SaveDirtyModel):
                 payment.account.save(remote=False)
                 payment.account_id = payment.account.pk
 
+        if payment.is_dirty():
+            logger.debug("dirty payment: %s", payment.dirty_fields())
         payment.save()
         return payment
 
@@ -856,21 +867,24 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
 
     for k, v in data.items():
         if k in fields:
-            # Check for uniqueness so we can update existing objects if they
-            # exist
-            if v and fields_by_name[k].unique:
-                unique_fields[k] = v
-
-            if k == "date" or k.endswith("_at"):
-                # TODO: (IW) Make sure dates are always in UTC and are tz-aware
-                pass
-
             # Fields with limited choices should always be lower case
-            if v and fields_by_name[k].choices:
-                v = v.lower()
+            if v:
+                if fields_by_name[k].choices:
+                    v = v.lower()
+
+                if isinstance(fields_by_name[k], models.CharField) or isinstance(fields_by_name[k], models.TextField):
+                    v = str(v)
+
+                if fields_by_name[k].unique:
+                    unique_fields[k] = v
 
             if v or not remove_empty:
                 update[str(k)] = v
+
+                # Check for uniqueness so we can update existing objects if they
+                # exist
+                if fields_by_name[k].unique:
+                    unique_fields[k] = v
 
     # Check for existing model object
     if unique_fields:
