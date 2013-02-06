@@ -873,13 +873,13 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
                     v = v.lower()
 
                 if isinstance(fields_by_name[k], models.CharField) or isinstance(fields_by_name[k], models.TextField):
-                    v = str(v)
+                    v = u"%s" % v
 
                 if fields_by_name[k].unique:
                     unique_fields[k] = v
 
             if v or not remove_empty:
-                update[str(k)] = v
+                update[u"%s" % k] = v
 
                 # Check for uniqueness so we can update existing objects if they
                 # exist
