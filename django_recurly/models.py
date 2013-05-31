@@ -146,7 +146,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
                 try:
                     validate_email(self.account_code)
                     self.user = User.objects.get(email=self.account_code)
-                    return True
                 except (ValidationError, User.DoesNotExist):
                     pass
 
