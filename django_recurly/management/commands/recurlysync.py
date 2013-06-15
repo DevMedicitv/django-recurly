@@ -1,6 +1,7 @@
 import sys
 
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from optparse import make_option
 
 from django.contrib.auth.models import User
@@ -49,6 +50,19 @@ class Command(BaseCommand):
             something_chosen = True
 
             for recurly_account in recurly.Account.all():
+                if recurly_account.account_code in settings.RECURLY_OWNER_MAP:
+                    try:
+                        old, new = (recurly_account.account_code,
+                            settings.RECURLY_OWNER_MAP[recurly_account.account_code])
+                        recurly_account.account_code = User.objects.get(
+                            email=settings.RECURLY_OWNER_MAP[recurly_account.account_code]).pk
+                        print "NOTICE: Mapped %s to %s (%s)." % (old, new,
+                            recurly_account.account_code)
+                    except User.DoesNotExist:
+                        print "ERROR: Could not map %s." % \
+                            recurly_account.account_code
+                        continue
+
                 try:
                     account = Account.sync_account(recurly_account=recurly_account)
                 except User.DoesNotExist:
