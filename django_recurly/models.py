@@ -25,7 +25,13 @@ __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 # kwargs. It can be overridden in the Django settings file by setting
 # 'RECURLY_ACCOUNT_CODE_TO_USER'.
 def account_code_to_user(account_code, account):
-    return User.objects.get(pk=account_code)
+    if account_code in settings.RECURLY_OWNER_MAP:
+        return User.objects.get(email=settings.RECURLY_OWNER_MAP[account_code])
+
+    try:
+        return User.objects.get(pk=account_code)
+    except User.DoesNotExist:
+        return User.objects.get(email=account_code)
 
 RECURLY_ACCOUNT_CODE_TO_USER = account_code_to_user
 if conf.RECURLY_ACCOUNT_CODE_TO_USER:
@@ -286,6 +292,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         logger.debug("Account.sync: %s", recurly_account.account_code)
         account = modelify(recurly_account, class_)
+        account.accept_language = ''
         account.save(remote=False)
 
         # Update billing info
