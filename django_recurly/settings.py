@@ -12,7 +12,7 @@ RECURLY_SUBDOMAIN = 'example'
 
 # The username & password used to authorise Recurly's
 # postback notifications. In the format "username:password"
-RECURLY_HTTP_AUTHENTICATION = "1234567890abcdefghijklmnop:abcdefghijklmnop0987654321"
+RECURLY_HTTP_AUTHENTICATION = b"1234567890abcdefghijklmnop:abcdefghijklmnop0987654321"
 
 # For the love of all things holy, please keep this set to a sensible
 # (i.e. unchanging / non daylight saving) timezone. This determines the
@@ -48,6 +48,25 @@ ROOT_URLCONF = "django_recurly.urls"
 
 SOUTH_MIGRATION_MODULES = {
     'django_recurly': 'django_recurly.south_migrations',
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    }
 }
 
 # local_settings.py can be used to override environment-specific settings

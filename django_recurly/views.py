@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 @recurly_basic_authentication
 @require_POST
 def push_notifications(request):
-    xml = request.raw_post_data
+    xml = request.body
     objects = recurly.objects_for_push_notification(xml.strip())
 
     try:

@@ -96,8 +96,9 @@ class BaseTest(TestCase):
 class RequestFactory(Client):
     # Used to generate request objects.
     def request(self, **request):
-        credentials = base64.encodebytes(HTTP_AUTHENTICATION.encode("utf8")).strip()
-        auth_string = 'Basic %s' % credentials
+        credentials = base64.encodebytes(HTTP_AUTHENTICATION).strip().decode("ascii")
+
+        auth_string = 'Basic ' + credentials
 
         environ = {
             'HTTP_COOKIE': self.cookies,

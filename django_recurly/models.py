@@ -166,7 +166,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         # Update Recurly account
         if kwargs.pop('remote', True):
             recurly_account = self.get_account()
-            for attr, value in self.dirty_fields().iteritems():
+            for attr, value in self.dirty_fields().items():
                 setattr(recurly_account, attr, value['new'])
             recurly_account.save()
 
@@ -331,7 +331,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         else:
             recurly_subscription = recurly.Subscription.get(kwargs.get("subscription").uuid)
             subscription = modelify(recurly_subscription, Subscription, context={'account': account})
-            subscription.xml = recurly_subscription.as_log_output(full=True)
+            subscription.xml = recurly_subscription.as_log_output()
 
             subscription.save(remote=False)
 
@@ -381,7 +381,7 @@ class BillingInfo(SaveDirtyModel):
         if kwargs.pop('remote', True):
             recurly_account = self.account.get_account()
             recurly_billing_info = recurly_account.billing_info
-            for attr, value in self.dirty_fields().iteritems():
+            for attr, value in self.dirty_fields().items():
                 setattr(recurly_billing_info, attr, value['new'])
             account.update_billing_info(billing_info)
 
@@ -484,7 +484,7 @@ class Subscription(SaveDirtyModel):
         # Update Recurly subscription
         if kwargs.pop('remote', True):
             recurly_subscription = self.get_subscription()
-            for attr, value in self.dirty_fields().iteritems():
+            for attr, value in self.dirty_fields().items():
                 setattr(recurly_subscription, attr, value['new'])
             recurly_subscription.save()
 
@@ -570,7 +570,7 @@ class Subscription(SaveDirtyModel):
 
         recurly_subscription = self.get_subscription()
 
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             setattr(recurly_subscription, k, v)
         recurly_subscription.timeframe = timeframe
         recurly_subscription.save()
@@ -650,7 +650,7 @@ class Subscription(SaveDirtyModel):
 
         logger.debug("Subscription.sync: %s", recurly_subscription.uuid)
         subscription = modelify(recurly_subscription, class_, follow=['account'])
-        subscription.xml = recurly_subscription.as_log_output(full=True)
+        subscription.xml = recurly_subscription.as_log_output()
 
         # TAKE NOTE:
         # `modelify()` doesn't assume you want to save every generated model
@@ -828,17 +828,10 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
 
     logger.debug("Modelify: %s", resource.nodename)
 
-    data = resource
-    try:
-        data = resource.to_dict()
-    except AttributeError:
-        logger.debug("Nope, not a resource: %s (expected %s)", resource, model)
-        pass
+    data = {key: getattr(resource, key, None) for key in resource.attributes}
+    assert isinstance(data, dict)
 
-    if not isinstance(data, dict):
-        raise TypeError("Cannot modelify non-dict '%s' (%s)" % (data, data.__class__.__name__))
-
-    for k, v in data.items():
+    for k, v in data.copy().items():
         # Expand 'uuid' to work with payment notifications and transaction API queries
         if k == 'uuid' and hasattr(resource, 'nodename') and not hasattr(data, resource.nodename + '_id'):
             data[resource.nodename + '_id'] = v
@@ -855,7 +848,7 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
                 continue
 
             logger.debug("Following linked: %s", k)
-            if isinstance(v, basestring):
+            if isinstance(v, str):
                 try:
                     v = resource.link(k)
                 except AttributeError:

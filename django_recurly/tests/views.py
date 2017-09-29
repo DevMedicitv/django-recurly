@@ -30,8 +30,9 @@ class PushNotificationViewTest(BaseTest):
 
     def test_new_subscription(self):
         request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"].encode("utf8"), content_type="text/xml")
+
         response = views.push_notifications(request)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 204)
 
         account = Account.objects.latest()
 

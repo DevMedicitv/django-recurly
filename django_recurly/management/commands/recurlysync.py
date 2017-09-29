@@ -56,11 +56,11 @@ class Command(BaseCommand):
                             settings.RECURLY_OWNER_MAP[recurly_account.account_code])
                         recurly_account.account_code = User.objects.get(
                             email=settings.RECURLY_OWNER_MAP[recurly_account.account_code]).pk
-                        print "NOTICE: Mapped %s to %s (%s)." % (old, new,
-                            recurly_account.account_code)
+                        print("NOTICE: Mapped %s to %s (%s)." % (old, new,
+                            recurly_account.account_code))
                     except User.DoesNotExist:
-                        print "ERROR: Could not map %s." % \
-                            recurly_account.account_code
+                        print("ERROR: Could not map %s." %
+                              recurly_account.account_code)
                         continue
 
                 try:

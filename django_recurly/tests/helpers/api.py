@@ -10,7 +10,8 @@ rf = RequestFactory()
 class GetSubscribeUrlTest(BaseTest):
     
     def test_encoding(self):
-        html = api.get_change_plan_form(plan_code="myplan")
+        html = api.get_change_plan_form(plan_code="myplan",
+                                        subscription_id="403bfb8cefa599c6a3af954293b64987")
         
         self.assertTrue('<form action="/change-plan/" method="POST">' in html, html)
         self.assertTrue('input type="hidden" name="plan_code" value="myplan">' in html, html)

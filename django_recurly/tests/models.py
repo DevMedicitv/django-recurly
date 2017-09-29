@@ -13,7 +13,7 @@ class AccountModelTest(BaseTest):
 
     def test_handle_notification_creating(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         account, subscription = Account.handle_notification(**data)
 
