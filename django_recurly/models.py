@@ -365,13 +365,13 @@ class BillingInfo(SaveDirtyModel):
     ip_address_country = models.CharField(max_length=2, null=True, blank=True)
 
     card_type = models.CharField(max_length=50, blank=True, null=True)
-    month = models.IntegerField(max_length=2, blank=True, null=True)
-    year = models.IntegerField(max_length=4, blank=True, null=True)
-    first_six = models.IntegerField(max_length=6, blank=True, null=True)
-    last_four = models.IntegerField(max_length=4, blank=True, null=True)
-    start_month = models.IntegerField(max_length=2, blank=True, null=True)
-    start_year = models.IntegerField(max_length=4, blank=True, null=True)
-    issue_number = models.IntegerField(max_length=4, blank=True, null=True)
+    month = models.IntegerField(blank=True, null=True)
+    year = models.IntegerField(blank=True, null=True)
+    first_six = models.IntegerField(blank=True, null=True)
+    last_four = models.IntegerField(blank=True, null=True)
+    start_month = models.IntegerField(blank=True, null=True)
+    start_year = models.IntegerField(blank=True, null=True)
+    issue_number = models.IntegerField(blank=True, null=True)
 
     # PayPal
     billing_agreement_id = models.CharField(max_length=100, blank=True, null=True)
