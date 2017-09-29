@@ -1,0 +1,5 @@
+mock
+django_extensions
+pytest
+pytest-django
+
