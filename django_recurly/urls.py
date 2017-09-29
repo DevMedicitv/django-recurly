@@ -1,4 +1,4 @@
-from django.conf.urls.defaults import *
+from django.conf.urls import *
 from django_recurly.views import push_notifications, success_token, \
     change_plan, account, invoice
 

@@ -1,5 +1,5 @@
 import urllib
-import urlparse
+import urllib.parse
 import random
 import string
 import json
