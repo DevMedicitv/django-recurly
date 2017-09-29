@@ -15,6 +15,8 @@ class AccountModelTest(BaseTest):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
         account, subscription = Account.handle_notification(data)
 
+        account, subscription = Account.handle_notification(**data)
+
         self.assertEqual(Account.objects.count(), 1)
         self.assertEqual(Subscription.objects.count(), 1)
 
@@ -38,12 +40,12 @@ class AccountModelTest(BaseTest):
 
     def test_handle_notification_updating_canceled(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        Account.handle_notification(data)
+        Account.handle_notification(**data)
 
         self.resetSignals()
 
         data = self.parse_xml(self.push_notifications["canceled_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         # Lets be through here
         self.assertEqual(account.user.username, "verena")
@@ -66,12 +68,12 @@ class AccountModelTest(BaseTest):
 
     def test_handle_notification_updating_expired(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        Account.handle_notification(data)
+        Account.handle_notification(**data)
 
         self.resetSignals()
 
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         # Lets be through here
         self.assertEqual(account.user.username, "verena")
@@ -97,7 +99,7 @@ class AccountModelTest(BaseTest):
     def test_handle_notification_updating_expired_real(self):
         # Straight in with no prior account
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-real"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         # Lets be through here
         self.assertEqual(account.user.username, "verena")
@@ -125,15 +127,15 @@ class AccountModelTest(BaseTest):
 
     def test_handle_notification_new_after_expired(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        Account.handle_notification(data)
+        Account.handle_notification(**data)
 
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-ok"])
-        Account.handle_notification(data)
+        Account.handle_notification(**data)
 
         self.resetSignals()
 
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        Account.handle_notification(data)
+        Account.handle_notification(**data)
 
         self.assertEqual(Account.objects.count(), 1)
         # We should now have the old expired subscription, plus the fresh new one
@@ -159,18 +161,18 @@ class SubscriptionModelTest(BaseTest):
 
     def test_is_current(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         self.assertTrue(Subscription.objects.latest().is_current())
 
         data = self.parse_xml(self.push_notifications["expired_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         self.assertFalse(Subscription.objects.latest().is_current())
 
     def test_is_trial(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         self.assertFalse(subscription.is_trial())
 
@@ -184,10 +186,10 @@ class PaymentModelTest(BaseTest):
 
     def test_handle_payment_successful(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         data = self.parse_xml(self.push_notifications["successful_payment_notification-ok"])
-        payment = Payment.handle_notification(data)
+        payment = Payment.handle_notification(**data)
 
         self.assertEqual(Payment.objects.count(), 1)
 
@@ -203,10 +205,10 @@ class PaymentModelTest(BaseTest):
 
     def test_handle_refund(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         data = self.parse_xml(self.push_notifications["successful_refund_notification-ok"])
-        payment = Payment.handle_notification(data)
+        payment = Payment.handle_notification(**data)
 
         self.assertEqual(Payment.objects.count(), 1)
 
@@ -221,10 +223,10 @@ class PaymentModelTest(BaseTest):
 
     def test_handle_void(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         data = self.parse_xml(self.push_notifications["void_payment_notification-ok"])
-        payment = Payment.handle_notification(data)
+        payment = Payment.handle_notification(**data)
 
         self.assertEqual(Payment.objects.count(), 1)
 
@@ -239,10 +241,10 @@ class PaymentModelTest(BaseTest):
 
     def test_handle_failed(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])
-        account, subscription = Account.handle_notification(data)
+        account, subscription = Account.handle_notification(**data)
 
         data = self.parse_xml(self.push_notifications["failed_payment_notification-ok"])
-        payment = Payment.handle_notification(data)
+        payment = Payment.handle_notification(**data)
 
         self.assertEqual(Payment.objects.count(), 1)
 

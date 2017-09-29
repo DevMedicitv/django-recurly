@@ -17,7 +17,7 @@ class PushNotificationViewTest(BaseTest):
         for name, xml in self.push_notifications.items():
             if "_refund_" in name or "_payment_" in name:
                 # This is a payment notification, for which we need an account to exist
-                request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"], content_type="text/xml")
+                request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"].encode("utf8"), content_type="text/xml")
                 response = views.push_notifications(request)
 
             signal, t = name.split("-")
@@ -29,7 +29,7 @@ class PushNotificationViewTest(BaseTest):
             self.assertSignal(signal)
 
     def test_new_subscription(self):
-        request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"], content_type="text/xml")
+        request = rf.post("/junk", self.push_notifications["new_subscription_notification-ok"].encode("utf8"), content_type="text/xml")
         response = views.push_notifications(request)
         self.assertEqual(response.status_code, 200)
 

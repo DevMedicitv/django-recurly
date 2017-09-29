@@ -71,7 +71,7 @@ class BaseTest(TestCase):
 
             name = xml_file.split("/")[-1]
 
-            self.push_notifications[name] = xml
+            self.push_notifications[os.path.basename(name)] = xml
 
         # Resources
         xml_dir = os.path.abspath(os.path.dirname(__file__)) + "/data/resources/*"
@@ -96,7 +96,7 @@ class BaseTest(TestCase):
 class RequestFactory(Client):
     # Used to generate request objects.
     def request(self, **request):
-        credentials = base64.encodestring(HTTP_AUTHENTICATION).strip()
+        credentials = base64.encodebytes(HTTP_AUTHENTICATION.encode("utf8")).strip()
         auth_string = 'Basic %s' % credentials
 
         environ = {

@@ -4,7 +4,7 @@
 # http://ericholscher.com/blog/2009/jun/29/enable-setuppy-test-your-django-apps/
 
 import os, sys
-os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
 
 test_dir = os.path.dirname(__file__)
 sys.path.insert(0, test_dir)
@@ -12,6 +12,8 @@ sys.path.insert(0, test_dir)
 from django.test.utils import get_runner
 from django.conf import settings
 
+import django
+django.setup()
 
 def runtests():
     test_runner_class = get_runner(settings)
