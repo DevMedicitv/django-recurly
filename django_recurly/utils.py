@@ -96,7 +96,7 @@ def safe_redirect(request, url, fallback="/"):
 
 
 def random_string(length=32):
-    return ''.join(random.choice(string.letters + string.digits) for i in xrange(length))
+    return ''.join(random.choice(string.letters + string.digits) for i in range(length))
 
 
 def dict_merge(target, *args):

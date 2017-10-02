@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<subscription href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3">
+<subscription href="https://api.recurly.com/v2/subscriptions/403bfb8cefa599c6a3af954293b64987">
   <account href="https://api.recurly.com/v2/accounts/verena@test.com" />
   <plan href="https://api.recurly.com/v2/plans/myplan">
     <plan_code>myplan</plan_code>
     <name>Test Plan</name>
   </plan>
-  <uuid>8047cb4fd5f874b14d713d785436ebd3</uuid>
+  <uuid>403bfb8cefa599c6a3af954293b64987</uuid>
   <state>active</state>
   <unit_amount_in_cents type="integer">900</unit_amount_in_cents>
   <currency>USD</currency>
@@ -21,7 +21,7 @@
   <trial_ends_at type="datetime">2012-11-13T19:11:01Z</trial_ends_at>
   <subscription_add_ons type="array">
   </subscription_add_ons>
-  <a href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/cancel" method="put" name="cancel" />
-  <a href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/terminate" method="put" name="terminate" />
-  <a href="https://api.recurly.com/v2/subscriptions/8047cb4fd5f874b14d713d785436ebd3/postpone" method="put" name="postpone" />
+  <a href="https://api.recurly.com/v2/subscriptions/403bfb8cefa599c6a3af954293b64987/cancel" method="put" name="cancel" />
+  <a href="https://api.recurly.com/v2/subscriptions/403bfb8cefa599c6a3af954293b64987/terminate" method="put" name="terminate" />
+  <a href="https://api.recurly.com/v2/subscriptions/403bfb8cefa599c6a3af954293b64987/postpone" method="put" name="postpone" />
 </subscription>

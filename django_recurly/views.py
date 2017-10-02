@@ -33,15 +33,32 @@ def push_notifications(request):
     return HttpResponse(status=204)
 
 
-@login_required
-@require_POST
+#@login_required
+#@require_POST
 def success_token(request):
-    recurly_token = request.POST.get("recurly_token")
+
+    recurly_token = request.POST.get("recurly-token")
+
+    subscription = recurly.Subscription(
+        plan_code = 'premium-monthly',
+        currency = 'EUR',
+        account = recurly.Account(
+            account_code='pat_smith',
+            billing_info=recurly.BillingInfo(token_id=recurly_token)
+        )
+    )
+    subscription.save()
+
+    return HttpResponse("All is ok! -> %r " % subscription)
+
+    ############
+
     token = models.Token(token=recurly_token)
 
     try:
         result = recurly.js.fetch(recurly_token)
     except Exception as e:
+        raise
         logger.warning("Failed to fetch details for success token '%s': %s", recurly_token, e)
         token.account = get_object_or_404(models.Account.active, user=request.user)
         token.save()

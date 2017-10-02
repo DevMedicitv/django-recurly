@@ -22,7 +22,7 @@ class BaseTest(TestCase):
         self.setUpMocks()
         self.setUpData()
 
-        self.user = User.objects.create(username="verena", email="moo@cow.com")
+        self.user = User.objects.create(username="verena", email="moo@cow.com")  #FIXME
 
     def tearDown(self):
         super(BaseTest, self).tearDown()

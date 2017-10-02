@@ -26,7 +26,7 @@ def recurly_basic_authentication(fn):
 
         try:
             if method.lower() != 'basic':
-                raise ValueError()
+                raise ValueError("Wrong auth method")
 
             token = base64.b64decode(auth.strip())
             if not constant_time_compare(token, wanted_authentication):

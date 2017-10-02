@@ -118,7 +118,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         ("closed", "Closed"),         # Account has been closed
     )
 
-    user = models.ForeignKey(User, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
 
     account_code = models.CharField(max_length=50, unique=True, null=False)
     username = models.CharField(max_length=50, blank=True, null=True)
@@ -153,7 +153,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
                     validate_email(self.account_code)
                     self.user = User.objects.get(email=self.account_code)
                     return True
-                except (ValidationError, User.DoesNotExist):
+                except (ValidationError, User.DoesNotExist):  # TODO - multiple objects ??
                     pass
 
         if self.user is None:
