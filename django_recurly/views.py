@@ -33,6 +33,7 @@ def push_notifications(request):
     return HttpResponse(status=204)
 
 
+# FIXME - this is quite broken
 #@login_required
 #@require_POST
 def success_token(request):
@@ -107,6 +108,7 @@ def change_plan(request):
     return safe_redirect(request, redirect_to)
 
 
+# FIXME - broken
 @login_required
 def account(request):
     account = get_object_or_404(models.Account.active, user=request.user)
