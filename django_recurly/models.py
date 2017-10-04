@@ -25,11 +25,10 @@ __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 # kwargs. It can be overridden in the Django settings file by setting
 # 'RECURLY_ACCOUNT_CODE_TO_USER'.
 def account_code_to_user(account_code, account):
-    if account_code in settings.RECURLY_OWNER_MAP:
-        return User.objects.get(email=settings.RECURLY_OWNER_MAP[account_code])
-
+    #if account_code in settings.RECURLY_OWNER_MAP:
+    #    return User.objects.get(email=settings.RECURLY_OWNER_MAP[account_code])
     try:
-        return User.objects.get(pk=account_code)
+        return User.objects.get(username=account_code)
     except User.DoesNotExist:
         return User.objects.get(email=account_code)
 
@@ -125,7 +124,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     email = models.CharField(max_length=100, blank=True, null=True)
     first_name = models.CharField(max_length=50, blank=True, null=True)
     last_name = models.CharField(max_length=50, blank=True, null=True)
-    company_name = models.CharField(max_length=50, blank=True, null=True)   # TODO: (IW) Should be 'company' - but not in the Docs, only in the Recurly-Client-Python code ??
+    company_name = models.CharField(max_length=50, blank=True, null=True)
     accept_language = models.CharField(max_length=6, blank=True, null=True)
 
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
@@ -141,11 +140,15 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if self.user is None:
+
+            assert RECURLY_ACCOUNT_CODE_TO_USER, RECURLY_ACCOUNT_CODE_TO_USER
             try:
                 # Associate the account with a user-defined lookup
                 self.user = RECURLY_ACCOUNT_CODE_TO_USER(
                     account_code=self.account_code, account=self)
             except Exception as e:
+                raise
+                # FIXME - this is deprecated, already done by RECURLY_ACCOUNT_CODE_TO_USER
                 # Fallback to email address (the Recurly default)
                 logger.warning("User lookup failed for account_code '%s'." \
                     "Falling back to User.email: %s", self.account_code, e)
@@ -212,6 +215,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def get_account(self):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
+    get_remote_account = get_account
 
     def get_invoices(self):
         return self.get_account().invoices
