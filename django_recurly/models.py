@@ -125,16 +125,27 @@ class Account(SaveDirtyModel, TimeStampedModel):
                              on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
     account_code = models.CharField(max_length=50, unique=True)
+
+    state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
+
     username = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     email = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
+    cc_emails = models.TextField(max_length=100, **BLANKABLE_FIELD_ARGS)  # comma-separated list
     first_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     last_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     company_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
-    accept_language = models.CharField(max_length=6, **BLANKABLE_CHARFIELD_ARGS)
+    vat_number = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    tax_exempt = models.BooleanField(default=False)
 
-    state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
-    hosted_login_token = models.CharField(max_length=32, **BLANKABLE_CHARFIELD_ARGS)
+    # no ADDRESS/SHIPPING_ADDRESS info stored for now
+
+    accept_language = models.CharField(max_length=6, **BLANKABLE_CHARFIELD_ARGS)
+    hosted_login_token = models.CharField(max_length=40, **BLANKABLE_CHARFIELD_ARGS)
+
+    # REMOTE dates!!
     created_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    updated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    closed_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
     objects = models.Manager()
     active = ActiveAccountManager()
@@ -348,7 +359,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
 
 class BillingInfo(SaveDirtyModel):
-    BILLING_TYPES = (
+    BILLING_TYPES = (  # OBSOLETE FIXME
         ("credit_card", "Credit Card"),
         ("paypal", "PayPal"),
     )
@@ -358,13 +369,18 @@ class BillingInfo(SaveDirtyModel):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
 
-    type = models.CharField(max_length=50, blank=True, null=True, choices=BILLING_TYPES)
+    company = models.CharField(max_length=50, blank=True, null=True)
 
-    company_name = models.CharField(max_length=50, blank=True, null=True)
     address1 = models.CharField(max_length=200, blank=True, null=True)
     address2 = models.CharField(max_length=200, blank=True, null=True)
+
     city = models.CharField(max_length=100, blank=True, null=True)
+
+    # FIXME ?????????
+    type = models.CharField(max_length=50, blank=True, null=True, choices=BILLING_TYPES)
+
     state = models.CharField(max_length=50, blank=True, null=True)
+
     zip = models.CharField(max_length=50, blank=True, null=True)
     country = models.CharField(max_length=2, null=True, blank=True)
     phone = models.CharField(max_length=50, blank=True, null=True)
@@ -378,12 +394,11 @@ class BillingInfo(SaveDirtyModel):
     year = models.IntegerField(blank=True, null=True)
     first_six = models.IntegerField(blank=True, null=True)
     last_four = models.IntegerField(blank=True, null=True)
-    start_month = models.IntegerField(blank=True, null=True)
-    start_year = models.IntegerField(blank=True, null=True)
-    issue_number = models.IntegerField(blank=True, null=True)
 
     # PayPal
-    billing_agreement_id = models.CharField(max_length=100, blank=True, null=True)
+    paypal_billing_agreement_id = models.CharField(max_length=100, blank=True, null=True)
+
+    updated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
     def save(self, *args, **kwargs):
         # Update Recurly billing info
@@ -392,7 +407,7 @@ class BillingInfo(SaveDirtyModel):
             recurly_billing_info = recurly_account.billing_info
             for attr, value in self.dirty_fields().items():
                 setattr(recurly_billing_info, attr, value['new'])
-            account.update_billing_info(billing_info)
+            account.update_billing_info(billing_info)  #??? FIXME
 
         super(BillingInfo, self).save(*args, **kwargs)
 
