@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 
 
+BLANKABLE_CHARFIELD_ARGS = dict(blank=True, null=False, default="")
+BLANKABLE_FIELD_ARGS = dict(blank=True, null=True)
+
+
 # Configurable function used to match a new Recurly account with a Django
 # User model. Custom functions may accept 'account_code' and 'account' as
 # kwargs. It can be overridden in the Django settings file by setting
@@ -117,19 +121,20 @@ class Account(SaveDirtyModel, TimeStampedModel):
         ("closed", "Closed"),         # Account has been closed
     )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_account", blank=True, null=True, on_delete=models.SET_NULL)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_account",
+                             on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
-    account_code = models.CharField(max_length=50, unique=True, null=False)
-    username = models.CharField(max_length=50, blank=True, null=True)
-    email = models.CharField(max_length=100, blank=True, null=True)
-    first_name = models.CharField(max_length=50, blank=True, null=True)
-    last_name = models.CharField(max_length=50, blank=True, null=True)
-    company_name = models.CharField(max_length=50, blank=True, null=True)
-    accept_language = models.CharField(max_length=6, blank=True, null=True)
+    account_code = models.CharField(max_length=50, unique=True)
+    username = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    email = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
+    first_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    last_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    company_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    accept_language = models.CharField(max_length=6, **BLANKABLE_CHARFIELD_ARGS)
 
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
-    hosted_login_token = models.CharField(max_length=32, blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
+    hosted_login_token = models.CharField(max_length=32, **BLANKABLE_CHARFIELD_ARGS)
+    created_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
     objects = models.Manager()
     active = ActiveAccountManager()
@@ -464,18 +469,18 @@ class Subscription(SaveDirtyModel):
     plan_version = models.IntegerField(default=1)
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
     quantity = models.IntegerField(default=1)
-    unit_amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in cents (i8n)!
+    unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")
 
-    activated_at = models.DateTimeField(blank=True, null=True)
-    canceled_at = models.DateTimeField(blank=True, null=True)
-    expires_at = models.DateTimeField(blank=True, null=True)
-    current_period_started_at = models.DateTimeField(blank=True, null=True)
-    current_period_ends_at = models.DateTimeField(blank=True, null=True)
-    trial_started_at = models.DateTimeField(blank=True, null=True)
-    trial_ends_at = models.DateTimeField(blank=True, null=True)
+    activated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    canceled_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    expires_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    current_period_started_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    current_period_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    trial_started_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    trial_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
-    xml = models.TextField(blank=True, null=True)
+    xml = models.TextField(**BLANKABLE_FIELD_ARGS)
 
     objects = models.Manager()
     current = CurrentSubscriptionManager()
@@ -705,20 +710,20 @@ class Payment(SaveDirtyModel):
         ("billing_info", "Updated billing info"),
     )
 
-    account = models.ForeignKey(Account, blank=True, null=True, db_index=True)
+    account = models.ForeignKey(Account, db_index=True, **BLANKABLE_FIELD_ARGS)
     transaction_id = models.CharField(max_length=40, unique=True, db_index=True)
-    invoice_id = models.CharField(max_length=40, blank=True, null=True, db_index=True)
+    invoice_id = models.CharField(max_length=40, db_index=True, **BLANKABLE_CHARFIELD_ARGS)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     source = models.CharField(max_length=100, choices=SOURCE_CHOICES)
-    amount_in_cents = models.IntegerField(blank=True, null=True)  # Not always in 'cents' (i8n)!
-    created_at = models.DateTimeField(blank=True, null=True)
+    amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # Not always in 'cents' (i8n)!
+    created_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
     message = models.CharField(max_length=250)  # Only set from push notifications
 
-    reference = models.CharField(max_length=100, blank=True, null=True)
-    details = models.TextField(blank=True, null=True)
-    xml = models.TextField(blank=True, null=True)
+    reference = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
+    details = models.TextField(**BLANKABLE_FIELD_ARGS)
+    xml = models.TextField(**BLANKABLE_FIELD_ARGS)
 
     class Meta:
         ordering = ["-id"]
@@ -789,11 +794,11 @@ class Token(TimeStampedModel):
         ('invoice', 'Invoice'),
     )
 
-    account = models.ForeignKey(Account, blank=True, null=True, related_name="tokens")
+    account = models.ForeignKey(Account, related_name="tokens", **BLANKABLE_FIELD_ARGS)
     token = models.CharField(max_length=40, unique=True)
     cls = models.CharField(max_length=12, choices=TYPE_CHOICES)
     identifier = models.CharField(max_length=40)
-    xml = models.TextField(blank=True, null=True)
+    xml = models.TextField(**BLANKABLE_FIELD_ARGS)
 
 
 # Connect model signal handlers
