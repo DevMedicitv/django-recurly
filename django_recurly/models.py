@@ -120,6 +120,9 @@ class SaveDirtyModel(models.Model):
 
 
 class Account(SaveDirtyModel, TimeStampedModel):
+
+    UNIQUE_LOOKUP_FIELD = "account_code"
+
     ACCOUNT_STATES = (
         ("active", "Active"),         # Active account (but may not have billing info)
         ("closed", "Closed"),         # Account has been closed
@@ -139,7 +142,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     last_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     company_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     vat_number = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
-    tax_exempt = models.BooleanField(default=False)
+    tax_exempt = models.NullBooleanField(default=False)
 
     # no ADDRESS/SHIPPING_ADDRESS info stored for now
 
@@ -364,6 +367,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
 class BillingInfo(SaveDirtyModel):
 
+    UNIQUE_LOOKUP_FIELD = None
+
     account = models.OneToOneField(Account, related_name='billing_info')
 
     first_name = models.CharField(max_length=50)
@@ -478,6 +483,9 @@ class BillingInfo(SaveDirtyModel):
 
 
 class Subscription(SaveDirtyModel):
+
+    UNIQUE_LOOKUP_FIELD = "uuid"
+
     SUBSCRIPTION_STATES = (
         ("future", "Future"),  # Will become active after a date
         ("active", "Active"),         # Active and everything is fine
@@ -723,6 +731,9 @@ class Subscription(SaveDirtyModel):
 
 # TODO - update fields of this model according to recurly.Transaction
 class Payment(SaveDirtyModel):
+
+    UNIQUE_LOOKUP_FIELD = "transaction_id"
+
     ACTION_CHOICES = (
         ("verify", "Verify"),
         ("purchase", "Purchase"),
@@ -856,8 +867,10 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
     there is no match. Modelify does not save any models back to the database,
     it is left up to the application logic to decide when to do that.'''
 
+    sentinel = object()
+
     # TODO: (IW) Make this smarter, not necessary.
-    MODEL_MAP = {
+    MODEL_MAP = {  # FIXME RECURSE
         'user': User,
         'account': Account,
         'billing_info': BillingInfo,
@@ -865,16 +878,22 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
         'transaction': Payment,
     }
 
-    fields = set(field.name for field in model._meta.fields)
-    fields_by_name = dict((field.name, field) for field in model._meta.fields)
-    fields.discard("id")
+    UNTOUCHABLE_MODEL_FIELDS = ["id", "user", "account"]  # pk and foreign keys
+    model_fields_by_name = dict((field.name, field) for field in model._meta.fields
+                                if field.name not in UNTOUCHABLE_MODEL_FIELDS)
+    model_fields = set(model_fields_by_name.keys())
 
-    logger.debug("Modelify: %s", resource.nodename)
+    # we ensure that missing attributes of xml payload don't lead to bad overrides of model fields
+    # some values may be present and None though, due to nil="nil" xml attribute
+    remote_data = {key: getattr(resource, key, sentinel) for key in resource.attributes}
+    remote_data = {key: value for (key, value) in remote_data.items() if value is not sentinel}
 
-    data = {key: getattr(resource, key, None) for key in resource.attributes}
-    assert isinstance(data, dict)
+    logger.debug("Modelify %s: %s", resource.nodename, remote_data)
 
+    '''
     for k, v in data.copy().items():
+
+        # FIXME - still useful ???
         # Expand 'uuid' to work with payment notifications and transaction API queries
         if k == 'uuid' and hasattr(resource, 'nodename') and not hasattr(data, resource.nodename + '_id'):
             data[resource.nodename + '_id'] = v
@@ -897,55 +916,49 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
                 except AttributeError:
                     pass
 
-            if callable(v):
+            if callable(v):  # ??? when ???
                 v = v()
 
             logger.debug("Modelifying nested: %s", k)
             # TODO: (IW) This won't attach foreign keys for reverse lookups
             # e.g. account has no attribute 'billing_info'
             data[k] = modelify(v, MODEL_MAP[k], remove_empty=remove_empty, follow=follow, context=context)
+    '''
 
-    update = {}
-    unique_fields = {}
 
-    for k, v in data.items():
-        if k in fields:
-            # Fields with limited choices should always be lower case
-            if v:
-                if fields_by_name[k].choices:
-                    v = v.lower()
+    model_updates = {}
 
-                if isinstance(fields_by_name[k], models.CharField) or isinstance(fields_by_name[k], models.TextField):
-                    v = u"%s" % v
+    for k, v in remote_data.items():
 
-                if fields_by_name[k].unique:
-                    unique_fields[k] = v
+        if k not in model_fields:
+            continue  # data not mirrored in SQL DB
 
-            if v or not remove_empty:
-                update[u"%s" % k] = v
+        # Fields with limited choices should always be lower case
+        if v and model_fields_by_name[k].choices:
+            v = v.lower()  # this shall be a string
 
-                # Check for uniqueness so we can update existing objects if they
-                # exist
-                if fields_by_name[k].unique:
-                    unique_fields[k] = v
+        if v or not remove_empty:
+            model_updates[k] = v
 
-    # Check for existing model object
-    if unique_fields:
-        try:
-            obj = model.objects.get(**unique_fields)
-        except model.DoesNotExist:
-            logger.debug("No %s row found matching unique fields '%s'", model.__name__, unique_fields)
-            pass
-        else:
-            logger.debug("Found existing row for %s (%s)", obj.__class__.__name__, obj.pk)
 
-            # Update fields
-            for k, v in update.items():
-                setattr(obj, k, v)
+    # Check for existing model object with the same unique field (account_code, uuid...)
 
-            return obj
+    if not model_updates.get(model.UNIQUE_LOOKUP_FIELD):
+        raise RuntimeWarning("Remote recurly record has no value for unique field %s" %
+                             model.UNIQUE_LOOKUP_FIELD)
+    unique_field_filter = {model.UNIQUE_LOOKUP_FIELD: model_updates[model.UNIQUE_LOOKUP_FIELD]}
 
-    # This is a new instance
-    # TODO: (IW) Auto-save models?
-    logger.debug("Returning new %s object", model.__name__)
-    return model(**update)
+    try:
+        obj = model.objects.get(**unique_field_filter)
+    except model.DoesNotExist:
+        logger.debug("No %s row found matching unique field filter '%s', returning new object", model.__name__, unique_field_filter)
+        # Create a new model instance (unsaved)
+        return model(**model_updates)
+    else:
+        logger.debug("Found existing %s row id=%s for remote recurly data", obj.__class__.__name__, obj.pk)
+        # Update fields of existing objects (even with None values)
+        for k, v in model_updates.items():
+            setattr(obj, k, v)
+        return obj
+
+
