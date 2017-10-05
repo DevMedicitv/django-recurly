@@ -369,34 +369,35 @@ class BillingInfo(SaveDirtyModel):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
 
-    company = models.CharField(max_length=50, blank=True, null=True)
+    company = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
-    address1 = models.CharField(max_length=200, blank=True, null=True)
-    address2 = models.CharField(max_length=200, blank=True, null=True)
+    address1 = models.CharField(max_length=200, **BLANKABLE_CHARFIELD_ARGS)
+    address2 = models.CharField(max_length=200, **BLANKABLE_CHARFIELD_ARGS)
 
-    city = models.CharField(max_length=100, blank=True, null=True)
+    city = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
 
     # FIXME ?????????
-    type = models.CharField(max_length=50, blank=True, null=True, choices=BILLING_TYPES)
+    type = models.CharField(max_length=50, choices=BILLING_TYPES,
+                            **BLANKABLE_CHARFIELD_ARGS)
 
-    state = models.CharField(max_length=50, blank=True, null=True)
+    state = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
-    zip = models.CharField(max_length=50, blank=True, null=True)
-    country = models.CharField(max_length=2, null=True, blank=True)
-    phone = models.CharField(max_length=50, blank=True, null=True)
+    zip = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    country = models.CharField(max_length=2, **BLANKABLE_CHARFIELD_ARGS)
+    phone = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
-    vat_number = models.CharField(max_length=16, blank=True, null=True)
-    ip_address = models.GenericIPAddressField(blank=True, null=True)
-    ip_address_country = models.CharField(max_length=2, null=True, blank=True)
+    vat_number = models.CharField(max_length=16, **BLANKABLE_CHARFIELD_ARGS)
+    ip_address = models.GenericIPAddressField(**BLANKABLE_FIELD_ARGS)
+    ip_address_country = models.CharField(max_length=2, **BLANKABLE_CHARFIELD_ARGS)
 
-    card_type = models.CharField(max_length=50, blank=True, null=True)
-    month = models.IntegerField(blank=True, null=True)
-    year = models.IntegerField(blank=True, null=True)
-    first_six = models.IntegerField(blank=True, null=True)
-    last_four = models.IntegerField(blank=True, null=True)
+    card_type = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    month = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
+    year = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
+    first_six = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
+    last_four = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
 
     # PayPal
-    paypal_billing_agreement_id = models.CharField(max_length=100, blank=True, null=True)
+    paypal_billing_agreement_id = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
 
     updated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
 
@@ -478,7 +479,7 @@ class Subscription(SaveDirtyModel):
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
     )
 
-    account = models.ForeignKey(Account, blank=True, null=True)
+    account = models.ForeignKey(Account, **BLANKABLE_FIELD_ARGS)
     uuid = models.CharField(max_length=40, unique=True)
     plan_code = models.CharField(max_length=100)
     plan_version = models.IntegerField(default=1)
