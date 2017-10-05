@@ -54,7 +54,9 @@ class ActiveAccountManager(models.Manager):
 
 class CurrentSubscriptionManager(models.Manager):
     def get_query_set(self):
-        return super(CurrentSubscriptionManager, self).get_query_set().filter(Q(state__in=("active", "canceled")))  # i.e. not 'expired'
+        # we returns LIVE subscriptions, i.e. not 'expired' or 'future'
+        return (super(CurrentSubscriptionManager, self).get_query_set()
+                .filter(Q(state__in=("active", "canceled"))))
 
 
 class SaveDirtyModel(models.Model):
@@ -359,10 +361,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
 
 class BillingInfo(SaveDirtyModel):
-    BILLING_TYPES = (  # OBSOLETE FIXME
-        ("credit_card", "Credit Card"),
-        ("paypal", "PayPal"),
-    )
 
     account = models.OneToOneField(Account, related_name='billing_info')
 
@@ -376,10 +374,6 @@ class BillingInfo(SaveDirtyModel):
 
     city = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
 
-    # FIXME ?????????
-    type = models.CharField(max_length=50, choices=BILLING_TYPES,
-                            **BLANKABLE_CHARFIELD_ARGS)
-
     state = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
     zip = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
@@ -390,16 +384,25 @@ class BillingInfo(SaveDirtyModel):
     ip_address = models.GenericIPAddressField(**BLANKABLE_FIELD_ARGS)
     ip_address_country = models.CharField(max_length=2, **BLANKABLE_CHARFIELD_ARGS)
 
+    # If billing_type credit_card
     card_type = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
-    month = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
-    year = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
-    first_six = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
-    last_four = models.IntegerField(**BLANKABLE_CHARFIELD_ARGS)
+    month = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    year = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    first_six = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    last_four = models.IntegerField(**BLANKABLE_FIELD_ARGS)
 
-    # PayPal
+    # If billing_type paypal
     paypal_billing_agreement_id = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
 
     updated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+
+    @property
+    def billing_type(self):
+        if self.paypal_billing_agreement_id:
+            return "paypal"
+        else:
+            return "credit_card"
+
 
     def save(self, *args, **kwargs):
         # Update Recurly billing info
@@ -474,27 +477,38 @@ class BillingInfo(SaveDirtyModel):
 
 class Subscription(SaveDirtyModel):
     SUBSCRIPTION_STATES = (
+        ("future", "Future"),  # Will become active after a date
         ("active", "Active"),         # Active and everything is fine
         ("canceled", "Canceled"),     # Still active, but will not be renewed
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
     )
 
     account = models.ForeignKey(Account, **BLANKABLE_FIELD_ARGS)
-    uuid = models.CharField(max_length=40, unique=True)
-    plan_code = models.CharField(max_length=100)
-    plan_version = models.IntegerField(default=1)
+
+    uuid = models.CharField(max_length=40, unique=True)  # REQUIRED
+
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
-    quantity = models.IntegerField(default=1)
+
+    plan_code = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
+    plan_name = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
+
     unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")
 
+    quantity = models.IntegerField(default=1)
+
+    # REMOTE dates
     activated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     canceled_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     expires_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    updated_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+
     current_period_started_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     current_period_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     trial_started_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     trial_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+
+    # TODO - add fields for taxes, addons, gifts, terms etc?
 
     xml = models.TextField(**BLANKABLE_FIELD_ARGS)
 
@@ -705,6 +719,7 @@ class Subscription(SaveDirtyModel):
         return class_.sync_subscription(recurly_subscription=recurly_subscription)
 
 
+# TODO - update fields of this model according to recurly.Transaction
 class Payment(SaveDirtyModel):
     ACTION_CHOICES = (
         ("verify", "Verify"),
@@ -815,6 +830,7 @@ class Token(TimeStampedModel):
     cls = models.CharField(max_length=12, choices=TYPE_CHOICES)
     identifier = models.CharField(max_length=40)
     xml = models.TextField(**BLANKABLE_FIELD_ARGS)
+
 
 
 # Connect model signal handlers
