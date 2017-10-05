@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 __all__ = ("Account", "Subscription", "User", "Payment", "Token")
 
 
-BLANKABLE_CHARFIELD_ARGS = dict(blank=True, null=False, default="")
 BLANKABLE_FIELD_ARGS = dict(blank=True, null=True)
+
+# we let charfields nullable, else overriding from recurly API is a mess...
+BLANKABLE_CHARFIELD_ARGS = BLANKABLE_FIELD_ARGS
 
 
 # Configurable function used to match a new Recurly account with a Django
