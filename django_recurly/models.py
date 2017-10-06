@@ -337,6 +337,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     @classmethod
     def create(class_, **kwargs):
+
         # Make sure billing_info is a Recurly BillingInfo resource
         billing_info = kwargs.pop('billing_info', None)
         if billing_info and not isinstance(billing_info, recurly.BillingInfo):
@@ -884,7 +885,7 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
     }
 
     UNTOUCHABLE_MODEL_FIELDS = ["id", "user", "account"]  # pk and foreign keys
-    EXTRA_ATTRIBUTES = ("hosted_login_token", "state")  # missing in resource.attributes
+    EXTRA_ATTRIBUTES = ("hosted_login_token", "state", "closed_at")  # missing in resource.attributes
     model_fields_by_name = dict((field.name, field) for field in model._meta.fields
                                 if field.name not in UNTOUCHABLE_MODEL_FIELDS)
     model_fields = set(model_fields_by_name.keys())

@@ -12,9 +12,40 @@ from mock import patch, Mock
 
 class AccountModelTest(BaseTest):
 
-    def test_modelify_account(self):
+    def _get_billing_info_creation_params(self):
+        return dict(
+            first_name = "jane_billing",
+            last_name = "doe_billing",
 
-        params = dict(
+            company = "my_billed_company",
+
+            address1 = "My first billing address",
+            address2 = "My second billing address",
+
+            city = "my_billing_city",
+
+            state = "California",
+
+            zip = "68998",
+            country = "USA",
+            phone = "0123456789",
+
+            vat_number = "US118822",
+            ip_address = "99.77.22.33",
+            #ip_address_country = "France", -> only set by Recurly
+
+            # If billing_type credit_card
+            #card_type = "Visa",  -> only set by Recurly
+            month = 5,
+            year = 2019,
+            number = "4111-1111-1111-1111",  # SPECIAL, only in INPUT of webservice
+
+            # If billing_type paypal
+            ###paypal_billing_agreement_id = "2836375363",
+        )
+
+    def _get_account_creation_params(self):
+        return dict(
             account_code="mytest_%s" % int(time.time()),
             state = "closed",
             username = "jane_username",
@@ -30,21 +61,34 @@ class AccountModelTest(BaseTest):
             hosted_login_token = "888666555",
         )
 
+    def test_modelify_account(self):
+
+        account_input_params = self._get_account_creation_params()
+
+        all_input_params = account_input_params.copy()
+        all_input_params["billing_info"] = self._get_billing_info_creation_params()
+
         account = Account.create(
-            **params
+            **all_input_params
         )
         print(account)
 
-        model_fields = dict((key, getattr(account, key)) for key in params.keys())
-        print("FINAL MODEL FIELDS", model_fields)
+        account_model_fields = dict((key, getattr(account, key))
+                                    for (key, input_value) in account_input_params.items())
+        print("FINAL MODEL FIELDS", account_model_fields)
 
-        for (key, input_value) in sorted(params.items()):
 
+        # Check that local Account model has been properly updated by WS output
+        for (key, input_value) in sorted(account_input_params.items()):
             if key in ["tax_exempt"]:
                 continue  # these params are NOT sent back, for whatever reason???
-
             model_value = getattr(account, key)
             assert model_value == input_value
+        for key in ("created_at", "updated_at"):
+            value = getattr(account, key)
+        assert account.closed_at is None
+
+        
 
 
 
