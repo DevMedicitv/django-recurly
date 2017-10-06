@@ -24,7 +24,7 @@ class AccountModelTest(BaseTest):
 
             city = "my_billing_city",
 
-            state = "California",
+            state = "Mississipi",
 
             zip = "68998",
             country = "USA",
@@ -64,9 +64,10 @@ class AccountModelTest(BaseTest):
     def test_modelify_account(self):
 
         account_input_params = self._get_account_creation_params()
+        billing_info_input_params = self._get_billing_info_creation_params()
 
         all_input_params = account_input_params.copy()
-        all_input_params["billing_info"] = self._get_billing_info_creation_params()
+        all_input_params["billing_info"] = billing_info_input_params
 
         account = Account.create(
             **all_input_params
@@ -86,9 +87,22 @@ class AccountModelTest(BaseTest):
             assert model_value == input_value
         for key in ("created_at", "updated_at"):
             value = getattr(account, key)
+            assert isinstance(value, datetime.datetime)
         assert account.closed_at is None
 
-        
+        # Check that local BillingInfo model has been properly updated by WS output
+        billing_info = account.billing_info
+        for (key, input_value) in sorted(billing_info_input_params.items()):
+            if key in ["number"]:
+                continue  # of course card number isn't directly reflected
+            model_value = getattr(billing_info, key)
+            assert model_value == input_value
+        assert billing_info.first_six == "411111"
+        assert billing_info.last_four == "1111"
+
+        #print("SUBSCRIPTIONS", account.subscriptions)
+        #print("TRANSACTIONS", account.transactions)
+
 
 
 

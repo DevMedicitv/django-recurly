@@ -14,7 +14,7 @@ from django_recurly import handlers
 from django.db.models.signals import post_save
 import importlib
 
-import logging
+import logging, sys
 logger = logging.getLogger(__name__)
 
 __all__ = ("Account", "Subscription", "User", "Payment", "Token")
@@ -165,6 +165,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         get_latest_by = "id"
 
     def save(self, *args, **kwargs):
+        ''' NOPE NOT HERE
         if self.user is None:
 
             assert RECURLY_ACCOUNT_CODE_TO_USER, RECURLY_ACCOUNT_CODE_TO_USER
@@ -198,6 +199,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             for attr, value in self.dirty_fields().items():
                 setattr(recurly_account, attr, value['new'])
             recurly_account.save()
+        '''
 
         super(Account, self).save(*args, **kwargs)
 
@@ -252,7 +254,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         except AttributeError:
             return None
 
-    def update_billing_info(self, billing_info):
+    def _______update_billing_info(self, billing_info):
         if isinstance(billing_info, dict):
             billing_info = recurly.BillingInfo(**billing_info)
         recurly_account = self.get_account()
@@ -278,7 +280,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         Subscription.sync_subscription(recurly_subscription=recurly_subscription)
 
-    def sync(self, recurly_account=None):
+    def __________sync(self, recurly_account=None):
         if recurly_account is None:
             recurly_account = self.get_account()
         try:
@@ -316,23 +318,26 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return class_.active.filter(user=user).latest()
 
     @classmethod
-    def sync_account(class_, recurly_account=None, account_code=None):
+    def update_local_data_from_recurly_resource(cls, recurly_account=None, account_code=None):
+
         if recurly_account is None:
+            assert account_code
             recurly_account = recurly.Account.get(account_code)
+        assert isinstance(recurly_account, recurly.Account)
 
-        logger.debug("Account.sync: %s", recurly_account.account_code)
-        account = modelify(recurly_account, class_)
-        ###account.accept_language = ''  # ??? why ?
-        account.save(remote=False)
+        logger.debug("Account.update_local_data_from_recurly_resource for %s", recurly_account.account_code)
+        account = modelify(recurly_account, cls)
+        ## useless account.save()
 
-        '''
-        # Update billing info
-        try:
-            BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
-        except AttributeError as e:
-            BillingInfo.sync_billing_info(account_code=account.account_code)
-        '''
-
+        ''' NOPE
+        # Update billing info from nested account data
+        if hasattr(recurly_account, "billing_info"):
+            BillingInfo.update_local_data_from_recurly_resource(
+                recurly_billing_info=recurly_account.billing_info
+            )
+        else:
+            BillingInfo.update_local_data_from_recurly_resource(account_code=account.account_code)
+            '''
         return account
 
     @classmethod
@@ -345,9 +350,13 @@ class Account(SaveDirtyModel, TimeStampedModel):
             kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
 
         recurly_account = recurly.Account(**kwargs)
-        recurly_account.save()
+        recurly_account.save()  # WS API call
 
-        return class_.sync_account(recurly_account=recurly_account)
+        if 'billing_info' in recurly_account.__dict__:
+            # UGLY bug, some attributes like this are not updated by resource.update_from_element()
+            del recurly_account.__dict__["billing_info"]
+
+        return class_.update_local_data_from_recurly_resource(recurly_account=recurly_account)
 
     @classmethod
     def handle_notification(class_, **kwargs):
@@ -418,6 +427,7 @@ class BillingInfo(SaveDirtyModel):
 
 
     def save(self, *args, **kwargs):
+        '''
         # Update Recurly billing info
         if kwargs.pop('remote', True):
             recurly_account = self.account.get_account()
@@ -425,10 +435,10 @@ class BillingInfo(SaveDirtyModel):
             for attr, value in self.dirty_fields().items():
                 setattr(recurly_billing_info, attr, value['new'])
             account.update_billing_info(billing_info)  #??? FIXME
-
+        '''
         super(BillingInfo, self).save(*args, **kwargs)
 
-    def sync(self, recurly_billing_info=None):
+    def ______sync(self, recurly_billing_info=None):
         if recurly_billing_info is None:
             recurly_account = self.account.get_account()
             try:
@@ -464,21 +474,10 @@ class BillingInfo(SaveDirtyModel):
         self.save(remote=False)
 
     @classmethod
-    def sync_billing_info(class_, recurly_billing_info=None, account_code=None):
-        if recurly_billing_info is None:
-            try:
-                recurly_billing_info = recurly.Account.get(account_code).billing_info
-            except AttributeError:
-                logger.debug("No billing info available for account_code '%s'",
-                    account_code)
-                try:
-                    BillingInfo.objects.filter(account__account_code=account_code).delete()
-                except BillingInfo.DoesNotExist:
-                    pass
-                return None
+    def update_local_data_from_recurly_resource(cls, recurly_billing_info):
 
         logger.debug("BillingInfo.sync: %s", recurly_billing_info)
-        billing_info = modelify(recurly_billing_info, class_, follow=['account'])
+        billing_info = modelify(recurly_billing_info, cls)
 
         if hasattr(billing_info, 'account') and not billing_info.account.pk:
             billing_info.account.save(remote=False)
@@ -863,10 +862,15 @@ post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_po
 
 ### Helpers ###
 
-# TODO: (IW) Add a method on a model base class so this can be used to refresh
-# instances
-def modelify(resource, model, remove_empty=False, follow=[], context={}):
-    '''Modelify handles the dirty work of converting Recurly Resource objects to
+
+def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None):
+    """
+    Convert recurly resource objects to django models, by creating new instances or updating existing ones.
+
+    Saves immediately the models created/updated.
+    """
+
+    __old = '''Modelify handles the dirty work of converting Recurly Resource objects to
     Django model instances, including resolving any additional Resource objects
     required to satisfy foreign key relationships. This method will query for
     existing instances based on unique model fields, or return a new instance if
@@ -875,18 +879,17 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
 
     sentinel = object()
 
-    # TODO: (IW) Make this smarter, not necessary.
-    MODEL_MAP = {  # FIXME RECURSE
-        'user': User,
-        'account': Account,
+    # maps substructures of recurly records to corresponding django models
+    SUBMODEL_MAPPER = {
+        #'account': Account,
         'billing_info': BillingInfo,
-        'subscription': Subscription,
-        'transaction': Payment,
+        #'subscription': Subscription,
+        #'transaction': Payment,
     }
 
-    UNTOUCHABLE_MODEL_FIELDS = ["id", "user", "account"]  # pk and foreign keys
+    UNTOUCHABLE_MODEL_FIELDS = ["id", "user", "account"] + list(SUBMODEL_MAPPER.keys())  # pk and foreign keys
     EXTRA_ATTRIBUTES = ("hosted_login_token", "state", "closed_at")  # missing in resource.attributes
-    model_fields_by_name = dict((field.name, field) for field in model._meta.fields
+    model_fields_by_name = dict((field.name, field) for field in model_class._meta.fields
                                 if field.name not in UNTOUCHABLE_MODEL_FIELDS)
     model_fields = set(model_fields_by_name.keys())
 
@@ -947,26 +950,82 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
         if v or not remove_empty:
             model_updates[k] = v
 
-    logger.debug("Modelify %s model pending updated: %s", resource.nodename, model_updates)
+    logger.debug("Modelify %s model pending updates: %s", resource.nodename, model_updates)
 
     # Check for existing model object with the same unique field (account_code, uuid...)
 
-    if not model_updates.get(model.UNIQUE_LOOKUP_FIELD):
-        raise RuntimeWarning("Remote recurly record has no value for unique field %s" %
-                             model.UNIQUE_LOOKUP_FIELD)
-    unique_field_filter = {model.UNIQUE_LOOKUP_FIELD: model_updates[model.UNIQUE_LOOKUP_FIELD]}
+    if existing_instance:
+        logger.debug("Using already provided %s instance with id=%s for update",
+                     model_class.__name__, existing_instance.pk)
 
-    try:
-        obj = model.objects.get(**unique_field_filter)
-    except model.DoesNotExist:
-        logger.debug("No %s row found matching unique field filter '%s', returning new object", model.__name__, unique_field_filter)
-        # Create a new model instance (unsaved)
-        return model(**model_updates)
+    elif model_class.UNIQUE_LOOKUP_FIELD:
+
+        if not model_updates.get(model_class.UNIQUE_LOOKUP_FIELD):
+            raise RuntimeError("Remote recurly record has no value for unique field %s" %
+                                 model_class.UNIQUE_LOOKUP_FIELD)
+
+        unique_field_filter = {model_class.UNIQUE_LOOKUP_FIELD:
+                               model_updates[model_class.UNIQUE_LOOKUP_FIELD]}
+
+        try:
+            existing_instance = model_class.objects.get(**unique_field_filter)
+            logger.debug("Found existing %s instance id=%s matching remote recurly data",
+                         model_class.__name__, existing_instance.pk)
+        except model_class.DoesNotExist:
+            logger.debug("No %s instance found matching unique field filter '%s', returning new object",
+                         model_class.__name__, unique_field_filter)
+
     else:
-        logger.debug("Found existing %s row id=%s for remote recurly data", obj.__class__.__name__, obj.pk)
-        # Update fields of existing objects (even with None values)
+        pass  # eg. case of a billing_info not existing locally yet
+
+    if existing_instance:
+        # Update fields of existing object (even with None values)
+        obj = existing_instance
         for k, v in model_updates.items():
             setattr(obj, k, v)
-        return obj
+    else:
+        # Create a new model instance
+        obj = model_class(**model_updates)
+
+    if presave_callback:
+        presave_callback(obj)
+    obj.save()  # sets primary key if not present
+
+    for (relation, subsinstance_klass) in SUBMODEL_MAPPER.items():
+
+        if not hasattr(model_class, relation):
+            continue  # this model doesn't contain such a relation
+
+        is_one_to_one_relation = not relation.endswith("s")  # quick and dirty
+        if is_one_to_one_relation:
+            def _new_presave_callback(_subobj):
+                setattr(obj, relation, _subobj)
+        else:
+            # it's a pool of related objects like "subscriptions"...
+            def _new_presave_callback(_subobj):
+                rels = getattr(obj, relation)
+                rels.add(_subobj)
+
+        local_instance = getattr(obj, relation, None)
+
+        logger.debug("LOOOOOOOOKUUING UP RESOURCE EXTRACT %s %s %s", resource, relation, resource.__dict__)
+        remote_resource = getattr(resource, relation, None)
+        #logger.debug("Remote_resource _elem: %s", remote_resource._elem)
+
+        if remote_resource:
+            # we create or override sub-instance
+            subobj = modelify(remote_resource, subsinstance_klass,
+                              existing_instance=local_instance,
+                              presave_callback=_new_presave_callback)
+            setattr(obj, relation, subobj)
+        else:
+            assert not remote_resource
+            if local_instance:
+                local_instance.delete()  # delete obsolete instance
+                setattr(obj, relation, None)  # security
+            else:
+                pass  # both unexisting, it's OK
+
+    return obj
 
 
