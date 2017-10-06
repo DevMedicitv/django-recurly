@@ -1,4 +1,5 @@
 import unittest
+import time
 import datetime
 
 from django.test import TestCase
@@ -10,6 +11,43 @@ from mock import patch, Mock
 
 
 class AccountModelTest(BaseTest):
+
+    def test_modelify_account(self):
+
+        params = dict(
+            account_code="mytest_%s" % int(time.time()),
+            state = "closed",
+            username = "jane_username",
+            email = "jane@doe.fr",
+            cc_emails = "jane1@doe.fr,jane2@doe.fr",
+            first_name = "jane",
+            last_name = "doe",
+            company_name = "my_company",
+            vat_number = "182672725",
+            tax_exempt = True,
+
+            accept_language = "fr-FR",
+            hosted_login_token = "888666555",
+        )
+
+        account = Account.create(
+            **params
+        )
+        print(account)
+
+        model_fields = dict((key, getattr(account, key)) for key in params.keys())
+        print("FINAL MODEL FIELDS", model_fields)
+
+        for (key, input_value) in sorted(params.items()):
+
+            if key in ["tax_exempt"]:
+                continue  # these params are NOT sent back, for whatever reason???
+
+            model_value = getattr(account, key)
+            assert model_value == input_value
+
+
+
 
     def test_handle_notification_creating(self):
         data = self.parse_xml(self.push_notifications["new_subscription_notification-ok"])

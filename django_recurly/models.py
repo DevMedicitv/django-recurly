@@ -36,7 +36,10 @@ def account_code_to_user(account_code, account):
     try:
         return User.objects.get(username=account_code)
     except User.DoesNotExist:
-        return User.objects.get(email=account_code)
+        try:
+            return User.objects.get(email=account_code)
+        except User.DoesNotExist:
+            return None
 
 RECURLY_ACCOUNT_CODE_TO_USER = account_code_to_user
 if conf.RECURLY_ACCOUNT_CODE_TO_USER:
@@ -44,7 +47,7 @@ if conf.RECURLY_ACCOUNT_CODE_TO_USER:
     mod = importlib.import_module(import_parts[0])
     try:
         RECURLY_ACCOUNT_CODE_TO_USER = getattr(mod, import_parts[1])
-    except Exception as e:
+    except AttributeError as e:
         logger.warning("User function failed to load: %s", e)
         pass
 
@@ -319,14 +322,16 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         logger.debug("Account.sync: %s", recurly_account.account_code)
         account = modelify(recurly_account, class_)
-        account.accept_language = ''
+        ###account.accept_language = ''  # ??? why ?
         account.save(remote=False)
 
+        '''
         # Update billing info
         try:
             BillingInfo.sync_billing_info(recurly_billing_info=recurly_account.billing_info)
         except AttributeError as e:
             BillingInfo.sync_billing_info(account_code=account.account_code)
+        '''
 
         return account
 
@@ -879,16 +884,17 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
     }
 
     UNTOUCHABLE_MODEL_FIELDS = ["id", "user", "account"]  # pk and foreign keys
+    EXTRA_ATTRIBUTES = ("hosted_login_token", "state")  # missing in resource.attributes
     model_fields_by_name = dict((field.name, field) for field in model._meta.fields
                                 if field.name not in UNTOUCHABLE_MODEL_FIELDS)
     model_fields = set(model_fields_by_name.keys())
 
     # we ensure that missing attributes of xml payload don't lead to bad overrides of model fields
     # some values may be present and None though, due to nil="nil" xml attribute
-    remote_data = {key: getattr(resource, key, sentinel) for key in resource.attributes}
+    remote_data = {key: getattr(resource, key, sentinel) for key in resource.attributes + EXTRA_ATTRIBUTES}
     remote_data = {key: value for (key, value) in remote_data.items() if value is not sentinel}
 
-    logger.debug("Modelify %s: %s", resource.nodename, remote_data)
+    logger.debug("Modelify %s record input: %s", resource.nodename, remote_data)
 
     '''
     for k, v in data.copy().items():
@@ -940,6 +946,7 @@ def modelify(resource, model, remove_empty=False, follow=[], context={}):
         if v or not remove_empty:
             model_updates[k] = v
 
+    logger.debug("Modelify %s model pending updated: %s", resource.nodename, model_updates)
 
     # Check for existing model object with the same unique field (account_code, uuid...)
 
