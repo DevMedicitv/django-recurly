@@ -131,6 +131,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         ("closed", "Closed"),         # Account has been closed
     )
 
+    # FIXME - rename as 'recurly_accounts', else put a one-to-one relationship instead
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_account",
                              on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
@@ -322,6 +323,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         from .sync import update_local_account_data_from_recurly_resource
 
+            # FIXME - remove this magic!?
         # Make sure billing_info is a Recurly BillingInfo resource
         billing_info = kwargs.pop('billing_info', None)
         if billing_info and not isinstance(billing_info, recurly.BillingInfo):
@@ -464,7 +466,7 @@ class Subscription(SaveDirtyModel):
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
     )
 
-    account = models.ForeignKey(Account, **BLANKABLE_FIELD_ARGS)
+    account = models.ForeignKey(Account, related_name="subscriptions", **BLANKABLE_FIELD_ARGS)
 
     uuid = models.CharField(max_length=40, unique=True)  # REQUIRED
 
@@ -501,12 +503,15 @@ class Subscription(SaveDirtyModel):
         get_latest_by = "id"
 
     def save(self, *args, **kwargs):
+
+        '''
         # Update Recurly subscription
         if kwargs.pop('remote', True):
             recurly_subscription = self.get_subscription()
             for attr, value in self.dirty_fields().items():
                 setattr(recurly_subscription, attr, value['new'])
             recurly_subscription.save()
+        '''
 
         super(Subscription, self).save(*args, **kwargs)
 
@@ -536,6 +541,7 @@ class Subscription(SaveDirtyModel):
     def get_subscription(self):
         # TODO: (IW) Cache/store subscription object
         return recurly.Subscription.get(self.uuid)
+    get_remote_subscription = get_subscription
 
     def get_pending_changes(self):
         if self.xml is None:
@@ -628,7 +634,7 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def sync(self, recurly_subscription=None):
+    def ______sync(self, recurly_subscription=None):
         if recurly_subscription is None:
             recurly_subscription = self.get_subscription()
         try:
@@ -664,7 +670,7 @@ class Subscription(SaveDirtyModel):
         return [plan.name for plan in recurly.Plan.all()]
 
     @classmethod
-    def sync_subscription(class_, recurly_subscription=None, uuid=None):
+    def ______sync_subscription(class_, recurly_subscription=None, uuid=None):
         if recurly_subscription is None:
             recurly_subscription = recurly.Subscription.get(uuid)
 
@@ -694,10 +700,14 @@ class Subscription(SaveDirtyModel):
 
     @classmethod
     def create(class_, **kwargs):
+        from django_recurly.sync import update_local_subscription_data_from_recurly_resource
+
         recurly_subscription = recurly.Subscription(**kwargs)
         recurly_subscription.save()
 
-        return class_.sync_subscription(recurly_subscription=recurly_subscription)
+        return update_local_subscription_data_from_recurly_resource(
+            recurly_subscription=recurly_subscription
+        )
 
 
 # TODO - update fields of this model according to recurly.Transaction

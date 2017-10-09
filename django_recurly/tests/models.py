@@ -4,12 +4,16 @@ import datetime
 import sys
 
 from django.test import TestCase
+from mock import patch, Mock
+import recurly
 
-from django_recurly.sync import update_local_account_data_from_recurly_resource
+from django_recurly.sync import update_local_account_data_from_recurly_resource, \
+    update_local_subscription_data_from_recurly_resource
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
-from mock import patch, Mock
+
+
 
 
 class AccountModelTest(BaseTest):
@@ -63,6 +67,31 @@ class AccountModelTest(BaseTest):
             hosted_login_token = "888666555",
         )
 
+    def _get_subscription_creation_params(self, account=None):
+
+        # nested structures must be real objects here
+        account = account or recurly.Account(**self._get_account_creation_params())
+        assert isinstance(account, recurly.Account), account
+        account.billing_info = recurly.BillingInfo(**self._get_billing_info_creation_params())
+
+        params = dict(
+
+            account = account,
+
+            currency = "EUR",
+
+            plan_code = "premium-monthly",
+
+            unit_amount_in_cents = 1100,
+
+            quantity = 2,
+
+            # here gift card, coupon code, addresse etc. can be added
+
+        )
+        return params
+
+
     def test_modelify_account_and_billing_info(self):
 
         account_input_params = self._get_account_creation_params()
@@ -92,7 +121,6 @@ class AccountModelTest(BaseTest):
             value = getattr(account, key)
             assert isinstance(value, datetime.datetime)
         assert account.closed_at is None
-
 
         # Check that local BillingInfo model has been properly updated by WS output
         billing_info = account.billing_info
@@ -149,6 +177,36 @@ class AccountModelTest(BaseTest):
         assert account.billing_info.first_name == "newfirstname_billing"
 
 
+    def test_modelify_subscription(self):
+
+        all_input_params = self._get_subscription_creation_params()
+
+        subscription = Subscription.create(
+            **all_input_params
+        )
+
+        for (key, input_value) in sorted(all_input_params.items()):
+            if key in ["account"]:
+                continue  # not automatically handled, actually
+            model_value = getattr(subscription, key)
+            assert model_value == input_value
+
+        assert isinstance(subscription.updated_at, datetime.datetime)
+        assert isinstance(subscription.current_period_ends_at, datetime.datetime)
+
+        remote_subscription = subscription.get_remote_subscription()
+        remote_subscription.quantity = 3
+        remote_subscription.save()
+
+        subscription2 = update_local_subscription_data_from_recurly_resource(remote_subscription)
+        assert subscription2.pk == subscription.pk  # "subscription" is outdated though
+        assert subscription2.quantity == 3
+
+        remote_subscription.cancel()  # uses "actionator" urls from XML payload
+
+        subscription3 = update_local_subscription_data_from_recurly_resource(remote_subscription)
+        assert subscription3.pk == subscription2.pk  # "subscription2" is outdated though
+        assert subscription3.state == "canceled"
 
 
     def test_handle_notification_creating(self):

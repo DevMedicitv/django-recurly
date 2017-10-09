@@ -2,7 +2,7 @@
 import recurly
 
 
-from .models import logger, Account, BillingInfo
+from .models import logger, Account, BillingInfo, Subscription
 
 
 
@@ -25,7 +25,7 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
 
     # maps substructures of recurly records to corresponding django models
     SUBMODEL_MAPPER = {
-        #'account': Account,
+        #'account': Account,  NOPE
         'billing_info': BillingInfo,
         #'subscription': Subscription,
         #'transaction': Payment,
@@ -145,6 +145,7 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
             def _new_presave_callback(_subobj):
                 setattr(obj, relation, _subobj)
         else:
+            raise RuntimeError("NOT is_one_to_one_relation case not tested yet")
             # it's a pool of related objects like "subscriptions"...
             def _new_presave_callback(_subobj):
                 rels = getattr(obj, relation)
@@ -183,15 +184,13 @@ def update_local_account_data_from_recurly_resource(recurly_account=None,
     Overrides local Account and BillingInfo fields with remote ones.
     """
 
-    cls = Account
-
     if recurly_account is None:
         assert account_code
         recurly_account = recurly.Account.get(account_code)
     assert isinstance(recurly_account, recurly.Account)
 
-    logger.debug("Account.update_local_data_from_recurly_resource for %s", recurly_account.account_code)
-    account = modelify(recurly_account, cls)
+    logger.debug("update_local_account_data_from_recurly_resource for %s", recurly_account.account_code)
+    account = modelify(recurly_account, Account)
     ## useless account.save()
 
     ''' NOPE
@@ -221,3 +220,14 @@ def ______update_local_billing_info_data_from_recurly_resource(recurly_billing_i
 
     billing_info.save(remote=False)
     return billing_info
+
+
+def update_local_subscription_data_from_recurly_resource(recurly_subscription):
+
+    ####print("------------------->", recurly_subscription)
+    assert isinstance(recurly_subscription, recurly.Subscription)
+
+    logger.debug("update_local_subscription_data_from_recurly_resource for %s", recurly_subscription.uuid)
+    subscription = modelify(recurly_subscription, Subscription)
+
+    return subscription
