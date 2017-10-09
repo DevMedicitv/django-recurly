@@ -116,10 +116,11 @@ class AccountModelTest(BaseTest):
         remote_account.save()
 
         assert remote_account.billing_info.company == "my_billed_company"
+        assert remote_account.billing_info.first_name == "jane_billing"
 
         remote_billing_info = remote_account.billing_info
-        remote_billing_info.company = "newcompany"
-        remote_billing_info.first_name = "newfirstname"
+        remote_billing_info.company = "newcompany_billing"
+        remote_billing_info.first_name = "newfirstname_billing"
 
         ##print("\n\n\n\n/////////////////////////\n", remote_billing_info.__dict__, file=sys.stderr)
 
@@ -130,10 +131,21 @@ class AccountModelTest(BaseTest):
         # we ensure that both current and new billing-info resources contain proper values
         for idx, acc in enumerate((account.get_remote_account(), remote_account)):
             assert acc.first_name == "newname"
-            assert acc.billing_info.company == "newcompany"  # badly documented parameter
-            assert acc.billing_info.first_name == "newfirstname"
+            assert acc.billing_info.company == "newcompany_billing"  # badly documented parameter
+            assert acc.billing_info.first_name == "newfirstname_billing"
 
+        # local DB not updated yet
+        assert account.first_name == "jane"
+        assert account.billing_info.company == "my_billed_company"
+        assert account.billing_info.first_name == "jane_billing"
 
+        account.update_local_data_from_recurly_resource(remote_account)
+        account.refresh_from_db()  # important
+        account.billing_info.refresh_from_db()  # important
+
+        assert account.first_name == "newname"
+        assert account.billing_info.company == "newcompany_billing"
+        assert account.billing_info.first_name == "newfirstname_billing"
 
 
 
