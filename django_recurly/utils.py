@@ -16,6 +16,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# FIXME - broken
 class RecurlyJsonEncoder(DjangoJSONEncoder):
     def __init__(self, js=False, *args, **kwargs):
         super(RecurlyJsonEncoder, self).__init__(*args, **kwargs)

@@ -5,6 +5,7 @@ import sys
 
 from django.test import TestCase
 
+from django_recurly.sync import update_local_account_data_from_recurly_resource
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
@@ -139,7 +140,7 @@ class AccountModelTest(BaseTest):
         assert account.billing_info.company == "my_billed_company"
         assert account.billing_info.first_name == "jane_billing"
 
-        account.update_local_data_from_recurly_resource(remote_account)
+        update_local_account_data_from_recurly_resource(remote_account)
         account.refresh_from_db()  # important
         account.billing_info.refresh_from_db()  # important
 
