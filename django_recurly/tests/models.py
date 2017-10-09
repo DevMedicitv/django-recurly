@@ -1,6 +1,7 @@
 import unittest
 import time
 import datetime
+import sys
 
 from django.test import TestCase
 
@@ -61,7 +62,7 @@ class AccountModelTest(BaseTest):
             hosted_login_token = "888666555",
         )
 
-    def test_modelify_account(self):
+    def test_modelify_account_and_billing_info(self):
 
         account_input_params = self._get_account_creation_params()
         billing_info_input_params = self._get_billing_info_creation_params()
@@ -78,6 +79,7 @@ class AccountModelTest(BaseTest):
                                     for (key, input_value) in account_input_params.items())
         print("FINAL MODEL FIELDS", account_model_fields)
 
+        assert not hasattr(account.get_remote_account(), "tax_exempt") # ABNORMAL
 
         # Check that local Account model has been properly updated by WS output
         for (key, input_value) in sorted(account_input_params.items()):
@@ -89,6 +91,7 @@ class AccountModelTest(BaseTest):
             value = getattr(account, key)
             assert isinstance(value, datetime.datetime)
         assert account.closed_at is None
+
 
         # Check that local BillingInfo model has been properly updated by WS output
         billing_info = account.billing_info
@@ -102,6 +105,34 @@ class AccountModelTest(BaseTest):
 
         #print("SUBSCRIPTIONS", account.subscriptions)
         #print("TRANSACTIONS", account.transactions)
+
+        # modifications of account and billing info must work fine
+        remote_account = account.get_remote_account()
+
+        #print("\n\n\n\n/////////////////////////\n", file=sys.stderr)
+
+        assert remote_account.first_name == "jane"
+        remote_account.first_name = "newname"
+        remote_account.save()
+
+        assert remote_account.billing_info.company == "my_billed_company"
+
+        remote_billing_info = remote_account.billing_info
+        remote_billing_info.company = "newcompany"
+        remote_billing_info.first_name = "newfirstname"
+
+        ##print("\n\n\n\n/////////////////////////\n", remote_billing_info.__dict__, file=sys.stderr)
+
+        remote_billing_info.save()  # alwo works: remote_account.update_billing_info(remote_billing_info)
+
+        ##account.update_local_data_from_recurly_resource()
+
+        # we ensure that both current and new billing-info resources contain proper values
+        for idx, acc in enumerate((account.get_remote_account(), remote_account)):
+            assert acc.first_name == "newname"
+            assert acc.billing_info.company == "newcompany"  # badly documented parameter
+            assert acc.billing_info.first_name == "newfirstname"
+
 
 
 
