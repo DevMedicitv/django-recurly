@@ -132,7 +132,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     )
 
     # FIXME - rename as 'recurly_accounts', else put a one-to-one relationship instead
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_account",
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_accounts",
                              on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
     account_code = models.CharField(max_length=50, unique=True)

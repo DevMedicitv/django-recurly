@@ -33,7 +33,7 @@ def subscription_form(context, plan_code, target_element="#recurly-container", p
     if user.is_authenticated():
         try:
             # Grab the recurly account details (could be different from app user details)
-            account = user.recurly_account.get().get_account()
+            account = user.recurly_accounts.get().get_account()
         except Account.DoesNotExist:
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
@@ -57,7 +57,7 @@ def billing_info_update_form(context, target_element="#recurly-container", prote
     if user.is_authenticated():
         try:
             # Grab the recurly account details (could be different from app user details)
-            account = user.recurly_account.get().get_account()
+            account = user.recurly_accounts.get().get_account()
         except Account.DoesNotExist:
             # Pre-populate the form fields with user data
             account = recurly.Account(**user._wrapped.__dict__)
@@ -79,6 +79,6 @@ def has_active_account(context):
         return False
 
     try:
-        user.recurly_account.get().is_active()
+        user.recurly_accounts.get().is_active()
     except Account.DoesNotExist:
         return False
