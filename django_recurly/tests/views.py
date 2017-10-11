@@ -9,7 +9,7 @@ from django_recurly.models import *
 
 rf = RequestFactory()
 
-
+'''
 class PushNotificationViewTest(BaseTest):
 
     def test_all(self):
@@ -51,3 +51,4 @@ class PushNotificationViewTest(BaseTest):
         self.assertEqual(subscription.quantity, 2)
         self.assertEqual(subscription.total_amount_in_cents, 2000)
         self.assertEqual(subscription.activated_at, datetime.datetime(2009, 11, 22, 21, 10, 38))
+'''

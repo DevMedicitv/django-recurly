@@ -204,31 +204,32 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         super(Account, self).save(*args, **kwargs)
 
-    def is_active(self):
+    def __is_active(self):
         return self.state == 'active'
 
-    def has_billing_info(self):
+    def __has_billing_info(self):
         try:
             self.billing_info
         except BillingInfo.DoesNotExist:
             return False
         return True
 
-    def has_subscription(self, plan_code=None):
+    def __has_subscription(self, plan_code=None):
         return self.get_subscriptions(plan_code=plan_code).exists()
 
-    def get_subscriptions(self, plan_code=None):
+    def __get_subscriptions(self, plan_code=None):
         """Get current (i.e. not 'expired') subscriptions for this Account. If
         no `plan_code` is specified then all current subscriptions are returned.
 
-        NOTE: An account may have multiple subscriptions of the same `plan_code`.
+        NOTE: an account may have multiple subscriptions of the same `plan_code`,
+        though recurly prevent multiple ACTIVE subscriptions on the same `plan_code`.
         """
         if plan_code is not None:
             return Subscription.current.filter(account=self, plan_code=plan_code)
         else:
             return Subscription.current.filter(account=self)
 
-    def get_subscription(self, plan_code=None):
+    def __get_subscription(self, plan_code=None):
         """Get current subscription of type `plan_code` for this Account.
 
         An exception will be raised if the account has more than one non-expired
@@ -241,15 +242,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
             raise Subscription.DoesNotExist()
         return subscriptions[0]
 
-    def get_account(self):
+    def get_remote_account(self):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
-    get_remote_account = get_account
 
-    def get_invoices(self):
+    def __get_invoices(self):
         return self.get_account().invoices
 
-    def get_transactions(self):
+    def __get_transactions(self):
         try:
             return self.get_account().transactions
         except AttributeError:
@@ -263,19 +263,19 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         BillingInfo.sync_billing_info(account_code=self.account_code)
 
-    def close(self):
+    def __close(self):
         recurly_account = self.get_account()
         recurly_account.delete()
 
         self.sync(recurly_account)
 
-    def reopen(self):
+    def __reopen(self):
         recurly_account = self.get_account()
         recurly_account.reopen()
 
         self.sync(recurly_account)
 
-    def subscribe(self, **kwargs):
+    def __subscribe(self, **kwargs):
         recurly_subscription = recurly.Subscription(**kwargs)
         self.get_account().subscribe(recurly_subscription)
 
@@ -315,7 +315,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             BillingInfo.sync_billing_info(account_code=self.account_code)
 
     @classmethod
-    def get_active(class_, user):
+    def __get_active(class_, user):
         return class_.active.filter(user=user).latest()
 
     @classmethod
@@ -340,7 +340,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
 
     @classmethod
-    def handle_notification(class_, **kwargs):
+    def __handle_notification(class_, **kwargs):
         """Update/create an account and its associated subscription using data
         from Recurly"""
 
@@ -515,10 +515,10 @@ class Subscription(SaveDirtyModel):
 
         super(Subscription, self).save(*args, **kwargs)
 
-    def is_canceled(self):
+    def __is_canceled(self):
         return self.state == 'canceled'
 
-    def is_current(self):
+    def __is_current(self):
         """Is this subscription current (i.e. not 'expired')
 
         Note that 'canceled' subscriptions are actually still considered
@@ -528,7 +528,7 @@ class Subscription(SaveDirtyModel):
         """
         return self.state != 'expired'
 
-    def is_trial(self):
+    def __is_trial(self):
         if not self.trial_started_at or not self.trial_ends_at:
             return False  # No trial dates, so not a trial
 
@@ -538,12 +538,11 @@ class Subscription(SaveDirtyModel):
         else:
             return False
 
-    def get_subscription(self):
+    def get_remote_subscription(self):
         # TODO: (IW) Cache/store subscription object
         return recurly.Subscription.get(self.uuid)
-    get_remote_subscription = get_subscription
 
-    def get_pending_changes(self):
+    def __get_pending_changes(self):
         if self.xml is None:
             return None
 
@@ -553,17 +552,17 @@ class Subscription(SaveDirtyModel):
             logger.debug("Failed to get pending changes: %s", e)
             return None
 
-    def get_plan(self):
+    def __get_plan(self):
         return recurly.Plan.get(self.plan_code)
 
-    def change_plan(self, plan_code, timeframe='now'):
+    def __change_plan(self, plan_code, timeframe='now'):
         """Change this subscription to the specified plan_code.
 
         This will call the Recurly API and update the subscription.
         """
         self.change(timeframe, plan_code=plan_code)
 
-    def change_quantity(self, quantity, incremental=False, timeframe='now'):
+    def __change_quantity(self, quantity, incremental=False, timeframe='now'):
         """Change this subscription quantity. The quantity will be changed to
         `quantity` if `incremental` is `False`, and increment the quantity by
         `quantity` if `incremental` is `True`.
@@ -575,7 +574,7 @@ class Subscription(SaveDirtyModel):
 
         self.change(timeframe, quantity=new_quantity)
 
-    def change(self, timeframe='now', **kwargs):
+    def __change(self, timeframe='now', **kwargs):
         """Change this subscription to the values supplied in the arguments
 
         `timeframe` may be one of:
@@ -603,7 +602,7 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def cancel(self):
+    def __cancel(self):
         """Cancel the subscription, it will expire at the end of the current
         billing cycle"""
         recurly_subscription = self.get_subscription()
@@ -612,7 +611,7 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def reactivate(self):
+    def __reactivate(self):
         """Reactivate the canceled subscription so it renews at the end of the
         current billing cycle"""
         recurly_subscription = self.get_subscription()
@@ -621,7 +620,7 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def terminate(self, refund="none"):
+    def __terminate(self, refund="none"):
         """Terminate the subscription
 
         `refund` may be one of:
@@ -666,7 +665,7 @@ class Subscription(SaveDirtyModel):
         self.save(remote=False)
 
     @classmethod
-    def get_plans(class_):
+    def __get_plans(class_):
         return [plan.name for plan in recurly.Plan.all()]
 
     @classmethod
@@ -828,6 +827,7 @@ class Token(TimeStampedModel):
 
 
 # Connect model signal handlers
+''' DISABLED ATM BECAUSE UNTESTED
 
 post_save.connect(handlers.account_post_save, sender=Account, dispatch_uid="account_post_save")
 post_save.connect(handlers.billing_info_post_save, sender=BillingInfo, dispatch_uid="billing_info_post_save")
@@ -835,4 +835,4 @@ post_save.connect(handlers.subscription_post_save, sender=Subscription, dispatch
 post_save.connect(handlers.payment_post_save, sender=Payment, dispatch_uid="payment_post_save")
 post_save.connect(handlers.token_post_save, sender=Token, dispatch_uid="token_post_save")
 
-
+'''

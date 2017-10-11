@@ -280,7 +280,7 @@ class AccountModelTest(BaseTest):
 
 
 
-
+'''
     # ------------------------------------- BROKEN STUFFS BELOW
 
 
@@ -531,3 +531,5 @@ class PaymentModelTest(BaseTest):
         self.assertEqual(payment.amount_in_cents, 1000)
         self.assertEqual(payment.status, "declined")
         self.assertEqual(payment.message, "This transaction has been declined")
+
+'''
