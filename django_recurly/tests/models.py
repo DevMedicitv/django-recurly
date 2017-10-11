@@ -93,6 +93,33 @@ class AccountModelTest(BaseTest):
         return params
 
 
+
+    def _create_recurly_test_account(self, plan_codes=None):
+
+        plan_codes = plan_codes or []
+
+        account_input_params = self._get_account_creation_params()
+        billing_info_input_params = self._get_billing_info_creation_params()
+        all_input_params = account_input_params.copy()
+        all_input_params["billing_info"] = billing_info_input_params
+        account = create_recurly_account(
+            **all_input_params
+        )
+
+        for plan_code in plan_codes:
+            recurly_account = account.get_remote_account()
+            all_input_params = self._get_subscription_creation_params(
+                plan_code=plan_code,
+                recurly_account=recurly_account
+            )
+            subscription = create_recurly_subscription(**all_input_params)
+            assert not subscription.account  # no auto-linking
+            account.subscriptions.add(subscription)
+
+        assert account.subscriptions.count() == len(plan_codes)
+        return account
+
+
     def test_update_local_account_data_from_recurly_resource(self):
 
         account_input_params = self._get_account_creation_params()
@@ -222,35 +249,18 @@ class AccountModelTest(BaseTest):
 
 
     def test_update_full_local_data_for_account_code(self):
-        pass
 
-        account_input_params = self._get_account_creation_params()
-        billing_info_input_params = self._get_billing_info_creation_params()
-        all_input_params = account_input_params.copy()
-        all_input_params["billing_info"] = billing_info_input_params
-        _account = create_recurly_account(
-            **all_input_params
-        )
+        _account = self._create_recurly_test_account(plan_codes=["premium-annual", "premium-monthly"])
+        assert _account.subscriptions.count() == 2  # untouched
+        _subscription = _account.subscriptions.first()
+        subscription_uuids = [x.uuid for x in _account.subscriptions.all()]
 
-        subscription_uuids = []
-        for plan_code in ["premium-annual", "premium-monthly"]:
-            recurly_account = _account.get_remote_account()
-            all_input_params = self._get_subscription_creation_params(
-                plan_code=plan_code,
-                recurly_account=recurly_account
-            )
-            _subscription = create_recurly_subscription(**all_input_params)
-            subscription_uuids.append(_subscription.uuid)
-            assert not _subscription.account  # no auto-linking
-        assert not _account.subscriptions.count()
-
-        # full refresh and auto-linking of account with its subscriptions
+        # full refresh
         account = update_full_local_data_for_account_code(account_code=_account.account_code)
-        assert account.subscriptions.count() == 2
+        assert account.subscriptions.count() == 2  # untouched
         assert account.pk == _account.pk
 
-
-        # modify remote recurly state
+        # we modify remote recurly state
 
         all_input_params = self._get_subscription_creation_params()
         rogue_subscription = create_recurly_subscription(**all_input_params)  # has different Account
@@ -261,7 +271,7 @@ class AccountModelTest(BaseTest):
 
         all_input_params = self._get_subscription_creation_params(
             plan_code="gift-3-months",
-            recurly_account=recurly_account
+            recurly_account=account.get_remote_account()
         )
         new_subscription = create_recurly_subscription(**all_input_params)  # same Account as others
 
