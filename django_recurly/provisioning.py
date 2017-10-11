@@ -6,7 +6,7 @@ from .models import logger, Account, BillingInfo, Subscription
 
 
 
-def create_recurly_account(**kwargs):
+def create_and_sync_recurly_account(**kwargs):
     """
     Returns a LOCAL Account instance.
     """
@@ -28,7 +28,7 @@ def create_recurly_account(**kwargs):
     return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
 
 
-def create_recurly_subscription(**kwargs):
+def create_and_sync_recurly_subscription(**kwargs):
     """
     Returns a LOCAL Subscription instance.
 
