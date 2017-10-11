@@ -107,7 +107,7 @@ class AccountModelTest(BaseTest):
         )
 
         for plan_code in plan_codes:
-            recurly_account = account.get_remote_account()
+            recurly_account = account.get_recurly_account()
             all_input_params = self._get_subscription_creation_params(
                 plan_code=plan_code,
                 recurly_account=recurly_account
@@ -137,7 +137,7 @@ class AccountModelTest(BaseTest):
                                     for (key, input_value) in account_input_params.items())
         print("FINAL MODEL FIELDS", account_model_fields)
 
-        assert not hasattr(account.get_remote_account(), "tax_exempt") # ABNORMAL
+        assert not hasattr(account.get_recurly_account(), "tax_exempt") # ABNORMAL
 
         # Check that local Account model has been properly updated by WS output
         for (key, input_value) in sorted(account_input_params.items()):
@@ -164,7 +164,7 @@ class AccountModelTest(BaseTest):
         #print("TRANSACTIONS", account.transactions)
 
         # modifications of account and billing info must work fine
-        remote_account = account.get_remote_account()
+        remote_account = account.get_recurly_account()
 
         #print("\n\n\n\n/////////////////////////\n", file=sys.stderr)
 
@@ -186,7 +186,7 @@ class AccountModelTest(BaseTest):
         ##account.update_local_data_from_recurly_resource()
 
         # we ensure that both current and new billing-info resources contain proper values
-        for idx, acc in enumerate((account.get_remote_account(), remote_account)):
+        for idx, acc in enumerate((account.get_recurly_account(), remote_account)):
             assert acc.first_name == "newname"
             assert acc.billing_info.company == "newcompany_billing"  # badly documented parameter
             assert acc.billing_info.first_name == "newfirstname_billing"
@@ -231,7 +231,7 @@ class AccountModelTest(BaseTest):
         assert isinstance(subscription.current_period_ends_at, datetime.datetime)
         assert not subscription.account  # NO AUTOLINKING here
 
-        remote_subscription = subscription.get_remote_subscription()
+        remote_subscription = subscription.get_recurly_subscription()
         remote_subscription.quantity = 3
         remote_subscription.save()
 
@@ -271,11 +271,11 @@ class AccountModelTest(BaseTest):
 
         all_input_params = self._get_subscription_creation_params(
             plan_code="gift-3-months",
-            recurly_account=account.get_remote_account()
+            recurly_account=account.get_recurly_account()
         )
         new_subscription = create_recurly_subscription(**all_input_params)  # same Account as others
 
-        _subscription.get_remote_subscription().terminate(refund='partial')
+        _subscription.get_recurly_subscription().terminate(refund='partial')
 
         assert account.subscriptions.count() == 3  # not yet refreshed
 

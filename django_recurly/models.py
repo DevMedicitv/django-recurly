@@ -242,7 +242,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
             raise Subscription.DoesNotExist()
         return subscriptions[0]
 
-    def get_remote_account(self):
+    def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
 
@@ -526,7 +526,7 @@ class Subscription(SaveDirtyModel):
         else:
             return False
 
-    def get_remote_subscription(self):
+    def get_recurly_subscription(self):
         # TODO: (IW) Cache/store subscription object
         return recurly.Subscription.get(self.uuid)
 
