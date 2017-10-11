@@ -241,12 +241,15 @@ def update_full_local_data_for_account_code(account_code):
 
     account = update_local_account_data_from_recurly_resource(recurly_account)
 
-    legit_subscriptions = []
-    for recurly_subscription in account.subscriptions():
+    legit_uuids = []
+    for recurly_subscription in recurly_account.subscriptions():
         subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
-        account.subscriptions.add(subscription)
-        legit_subscriptions.append(subscription)
+        account.subscriptions.add(subscription)  # model linking
+        legit_uuids.append(subscription.uuid)
 
-    # delete obsolete subscriptions
-    ##############
+    for subscription in account.subscriptions.all():
+        if subscription.uuid not in legit_uuids:
+            # TODO - issue a warning, it's ABNORMAL that subscriptions disappear in recurly servers!
+            subscription.delete()  # remove obsolete subscription
 
+    return account

@@ -9,7 +9,7 @@ from mock import patch, Mock
 import recurly
 
 from django_recurly.sync import update_local_account_data_from_recurly_resource, \
-    update_local_subscription_data_from_recurly_resource
+    update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
@@ -68,20 +68,20 @@ class AccountModelTest(BaseTest):
             hosted_login_token = "888666555",
         )
 
-    def _get_subscription_creation_params(self, account=None):
+    def _get_subscription_creation_params(self, recurly_account=None, plan_code="premium-monthly"):
 
         # nested structures must be real objects here
-        account = account or recurly.Account(**self._get_account_creation_params())
-        assert isinstance(account, recurly.Account), account
-        account.billing_info = recurly.BillingInfo(**self._get_billing_info_creation_params())
+        recurly_account = recurly_account or recurly.Account(**self._get_account_creation_params())
+        assert isinstance(recurly_account, recurly.Account), recurly_account
+        recurly_account.billing_info = recurly.BillingInfo(**self._get_billing_info_creation_params())
 
         params = dict(
 
-            account = account,
+            account = recurly_account,
 
             currency = "EUR",
 
-            plan_code = "premium-monthly",
+            plan_code = plan_code,
 
             unit_amount_in_cents = 1100,
 
@@ -93,7 +93,7 @@ class AccountModelTest(BaseTest):
         return params
 
 
-    def test_modelify_account_and_billing_info(self):
+    def test_update_local_account_data_from_recurly_resource(self):
 
         account_input_params = self._get_account_creation_params()
         billing_info_input_params = self._get_billing_info_creation_params()
@@ -186,7 +186,7 @@ class AccountModelTest(BaseTest):
 
 
 
-    def test_modelify_subscription(self):
+    def test_update_local_subscription_data_from_recurly_resource(self):
 
         all_input_params = self._get_subscription_creation_params()
 
@@ -218,6 +218,72 @@ class AccountModelTest(BaseTest):
         subscription3 = update_local_subscription_data_from_recurly_resource(remote_subscription)
         assert subscription3.pk == subscription2.pk  # "subscription2" is outdated though
         assert subscription3.state == "canceled"
+
+
+
+    def test_update_full_local_data_for_account_code(self):
+        pass
+
+        account_input_params = self._get_account_creation_params()
+        billing_info_input_params = self._get_billing_info_creation_params()
+        all_input_params = account_input_params.copy()
+        all_input_params["billing_info"] = billing_info_input_params
+        _account = Account.create(
+            **all_input_params
+        )
+
+        subscription_uuids = []
+        for plan_code in ["premium-annual", "premium-monthly"]:
+            recurly_account = _account.get_remote_account()
+            all_input_params = self._get_subscription_creation_params(
+                plan_code=plan_code,
+                recurly_account=recurly_account
+            )
+            _subscription = Subscription.create(**all_input_params)
+            subscription_uuids.append(_subscription.uuid)
+            assert not _subscription.account  # no auto-linking
+        assert not _account.subscriptions.count()
+
+        # full refresh and auto-linking of account with its subscriptions
+        account = update_full_local_data_for_account_code(account_code=_account.account_code)
+        assert account.subscriptions.count() == 2
+        assert account.pk == _account.pk
+
+
+        # modify remote recurly state
+
+        all_input_params = self._get_subscription_creation_params()
+        rogue_subscription = Subscription.create(**all_input_params)  # has different Account
+        rogue_subscription.account = account  # we introduce incoherence
+        rogue_subscription.save()
+
+        assert account.subscriptions.count() == 3
+
+        all_input_params = self._get_subscription_creation_params(
+            plan_code="gift-3-months",
+            recurly_account=recurly_account
+        )
+        new_subscription = Subscription.create(**all_input_params)  # same Account as others
+
+        _subscription.get_remote_subscription().terminate(refund='partial')
+
+        assert account.subscriptions.count() == 3  # not yet refreshed
+
+        __account = update_full_local_data_for_account_code(account_code=_account.account_code)
+        assert __account.pk == account.pk
+
+        subscription_uuids2 = [x.uuid for x in account.subscriptions.all()]
+        assert account.subscriptions.count() == 3
+
+        # rogue_subscription has been removed, new_subscription has been attached
+        assert set(subscription_uuids2) == set(subscription_uuids) | {new_subscription.uuid}
+
+
+
+
+    # ------------------------------------- BROKEN STUFFS BELOW
+
+
 
 
     def test_handle_notification_creating(self):
