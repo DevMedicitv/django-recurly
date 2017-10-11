@@ -321,7 +321,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     @classmethod
     def create(cls, **kwargs):
 
-        from .sync import update_local_account_data_from_recurly_resource
+        from .provisioning import update_local_account_data_from_recurly_resource
 
             # FIXME - remove this magic!?
         # Make sure billing_info is a Recurly BillingInfo resource
@@ -338,6 +338,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
             del recurly_account.__dict__["billing_info"]
 
         return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
+
+    def _________create_subscription(class_, **kwargs):
+        """Automatically attaches the new subscription to account instance"""
+        subscription = Subscription.create(**kwargs)
+        subscription.account = self
+        subscription.save()
+
+
 
     @classmethod
     def __handle_notification(class_, **kwargs):
@@ -699,7 +707,11 @@ class Subscription(SaveDirtyModel):
 
     @classmethod
     def create(class_, **kwargs):
-        from django_recurly.sync import update_local_subscription_data_from_recurly_resource
+        """
+        Beware, the newly created subscription will not be automatically attached
+        to the corresponding django Account instance.
+        """
+        from .provisioning import update_local_subscription_data_from_recurly_resource
 
         recurly_subscription = recurly.Subscription(**kwargs)
         recurly_subscription.save()

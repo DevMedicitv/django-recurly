@@ -8,7 +8,7 @@ from django.test import TestCase
 from mock import patch, Mock
 import recurly
 
-from django_recurly.sync import update_local_account_data_from_recurly_resource, \
+from django_recurly.provisioning import update_local_account_data_from_recurly_resource, \
     update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
