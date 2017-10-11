@@ -6,6 +6,45 @@ from .models import logger, Account, BillingInfo, Subscription
 
 
 
+def create_recurly_account(**kwargs):
+    """
+    Returns a LOCAL Account instance.
+    """
+
+    # FIXME - remove this magic!?
+    # Make sure billing_info is a Recurly BillingInfo resource
+    billing_info = kwargs.pop('billing_info', None)
+    if billing_info and not isinstance(billing_info, recurly.BillingInfo):
+        billing_info = dict(billing_info)
+        kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
+
+    recurly_account = recurly.Account(**kwargs)
+    recurly_account.save()  # WS API call
+
+    if 'billing_info' in recurly_account.__dict__:
+        # UGLY bug, some attributes like this are not updated by resource.update_from_element()
+        del recurly_account.__dict__["billing_info"]
+
+    return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
+
+
+def create_recurly_subscription(**kwargs):
+    """
+    Returns a LOCAL Subscription instance.
+
+    Beware, this newly created Subscription will not be
+    automatically attached to a corresponding django Account instance.
+    """
+
+    recurly_subscription = recurly.Subscription(**kwargs)
+    recurly_subscription.save()
+
+    return update_local_subscription_data_from_recurly_resource(
+        recurly_subscription=recurly_subscription
+    )
+
+
+
 
 def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None):
     """

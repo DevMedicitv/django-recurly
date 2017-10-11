@@ -9,10 +9,10 @@ from mock import patch, Mock
 import recurly
 
 from django_recurly.provisioning import update_local_account_data_from_recurly_resource, \
-    update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code
+    update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code, \
+    create_recurly_account, create_recurly_subscription
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
-
 
 
 
@@ -101,7 +101,7 @@ class AccountModelTest(BaseTest):
         all_input_params = account_input_params.copy()
         all_input_params["billing_info"] = billing_info_input_params
 
-        account = Account.create(
+        account = create_recurly_account(
             **all_input_params
         )
         print(account)
@@ -190,7 +190,7 @@ class AccountModelTest(BaseTest):
 
         all_input_params = self._get_subscription_creation_params()
 
-        subscription = Subscription.create(
+        subscription = create_recurly_subscription(
             **all_input_params
         )
 
@@ -228,7 +228,7 @@ class AccountModelTest(BaseTest):
         billing_info_input_params = self._get_billing_info_creation_params()
         all_input_params = account_input_params.copy()
         all_input_params["billing_info"] = billing_info_input_params
-        _account = Account.create(
+        _account = create_recurly_account(
             **all_input_params
         )
 
@@ -239,7 +239,7 @@ class AccountModelTest(BaseTest):
                 plan_code=plan_code,
                 recurly_account=recurly_account
             )
-            _subscription = Subscription.create(**all_input_params)
+            _subscription = create_recurly_subscription(**all_input_params)
             subscription_uuids.append(_subscription.uuid)
             assert not _subscription.account  # no auto-linking
         assert not _account.subscriptions.count()
@@ -253,7 +253,7 @@ class AccountModelTest(BaseTest):
         # modify remote recurly state
 
         all_input_params = self._get_subscription_creation_params()
-        rogue_subscription = Subscription.create(**all_input_params)  # has different Account
+        rogue_subscription = create_recurly_subscription(**all_input_params)  # has different Account
         rogue_subscription.account = account  # we introduce incoherence
         rogue_subscription.save()
 
@@ -263,7 +263,7 @@ class AccountModelTest(BaseTest):
             plan_code="gift-3-months",
             recurly_account=recurly_account
         )
-        new_subscription = Subscription.create(**all_input_params)  # same Account as others
+        new_subscription = create_recurly_subscription(**all_input_params)  # same Account as others
 
         _subscription.get_remote_subscription().terminate(refund='partial')
 

@@ -318,26 +318,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def __get_active(class_, user):
         return class_.active.filter(user=user).latest()
 
-    @classmethod
-    def create(cls, **kwargs):
-
-        from .provisioning import update_local_account_data_from_recurly_resource
-
-            # FIXME - remove this magic!?
-        # Make sure billing_info is a Recurly BillingInfo resource
-        billing_info = kwargs.pop('billing_info', None)
-        if billing_info and not isinstance(billing_info, recurly.BillingInfo):
-            billing_info = dict(billing_info)
-            kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
-
-        recurly_account = recurly.Account(**kwargs)
-        recurly_account.save()  # WS API call
-
-        if 'billing_info' in recurly_account.__dict__:
-            # UGLY bug, some attributes like this are not updated by resource.update_from_element()
-            del recurly_account.__dict__["billing_info"]
-
-        return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
 
     def _________create_subscription(class_, **kwargs):
         """Automatically attaches the new subscription to account instance"""
@@ -704,21 +684,6 @@ class Subscription(SaveDirtyModel):
 
         subscription.save(remote=False)
         return subscription
-
-    @classmethod
-    def create(class_, **kwargs):
-        """
-        Beware, the newly created subscription will not be automatically attached
-        to the corresponding django Account instance.
-        """
-        from .provisioning import update_local_subscription_data_from_recurly_resource
-
-        recurly_subscription = recurly.Subscription(**kwargs)
-        recurly_subscription.save()
-
-        return update_local_subscription_data_from_recurly_resource(
-            recurly_subscription=recurly_subscription
-        )
 
 
 # TODO - update fields of this model according to recurly.Transaction
