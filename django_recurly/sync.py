@@ -151,23 +151,27 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
                 rels = getattr(obj, relation)
                 rels.add(_subobj)
 
-        local_instance = getattr(obj, relation, None)
+        local_subinstance = getattr(obj, relation, None)
 
-        logger.debug("LOOOOOOOOKUUING UP RESOURCE EXTRACT %s %s %s", resource, relation, resource.__dict__)
-        remote_resource = getattr(resource, relation, None)
+        #logger.debug("LOOOOOOOOKING UP RESOURCE EXTRACT %s %s %s", resource, relation, resource.__dict__)
+
+        try:
+            remote_subresource = getattr(resource, relation, None)
+        except recurly.errors.NotFoundError:
+            remote_subresource = None
         #logger.debug("Remote_resource _elem: %s", remote_resource._elem)
 
-        if remote_resource:
+        if remote_subresource:
             # we create or override sub-instance
-            subobj = modelify(remote_resource, subsinstance_klass,
-                              existing_instance=local_instance,
+            subobj = modelify(remote_subresource, subsinstance_klass,
+                              existing_instance=local_subinstance,
                               presave_callback=_new_presave_callback)
-            setattr(obj, relation, subobj)
+            setattr(obj, relation, subobj)  # might be a NO-OP here
         else:
-            assert not remote_resource
-            if local_instance:
-                local_instance.delete()  # delete obsolete instance
-                setattr(obj, relation, None)  # security
+            assert not remote_subresource
+            if local_subinstance:
+                local_subinstance.delete()  # delete obsolete instance in DB
+                assert getattr(obj, relation) is local_subinstance  # proxy remains
             else:
                 pass  # both unexisting, it's OK
 
@@ -177,22 +181,15 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
 
 
 
-
-def update_local_account_data_from_recurly_resource(recurly_account=None,
-                                                    account_code=None):
+def update_local_account_data_from_recurly_resource(recurly_account):
     """
     Overrides local Account and BillingInfo fields with remote ones.
     """
 
-    if recurly_account is None:
-        assert account_code
-        recurly_account = recurly.Account.get(account_code)
-    assert isinstance(recurly_account, recurly.Account)
-
     logger.debug("update_local_account_data_from_recurly_resource for %s", recurly_account.account_code)
     account = modelify(recurly_account, Account)
-    ## useless account.save()
 
+    ## useless account.save()
     ''' NOPE
     # Update billing info from nested account data
     if hasattr(recurly_account, "billing_info"):
@@ -223,6 +220,9 @@ def ______update_local_billing_info_data_from_recurly_resource(recurly_billing_i
 
 
 def update_local_subscription_data_from_recurly_resource(recurly_subscription):
+    """
+    Overrides local fields of this Subscription with remote ones.
+    """
 
     ####print("------------------->", recurly_subscription)
     assert isinstance(recurly_subscription, recurly.Subscription)
@@ -231,3 +231,22 @@ def update_local_subscription_data_from_recurly_resource(recurly_subscription):
     subscription = modelify(recurly_subscription, Subscription)
 
     return subscription
+
+
+
+def update_full_local_data_for_account_code(account_code):
+
+    recurly_account = recurly.Account.get(account_code)
+    assert isinstance(recurly_account, recurly.Account), recurly_account
+
+    account = update_local_account_data_from_recurly_resource(recurly_account)
+
+    legit_subscriptions = []
+    for recurly_subscription in account.subscriptions():
+        subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
+        account.subscriptions.add(subscription)
+        legit_subscriptions.append(subscription)
+
+    # delete obsolete subscriptions
+    ##############
+

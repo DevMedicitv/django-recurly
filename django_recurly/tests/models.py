@@ -3,6 +3,7 @@ import time
 import datetime
 import sys
 
+import pytest
 from django.test import TestCase
 from mock import patch, Mock
 import recurly
@@ -176,6 +177,14 @@ class AccountModelTest(BaseTest):
         assert account.billing_info.company == "newcompany_billing"
         assert account.billing_info.first_name == "newfirstname_billing"
 
+        remote_billing_info.delete()
+        update_local_account_data_from_recurly_resource(remote_account)
+
+        assert account.billing_info  # ghost object
+        with pytest.raises(account.billing_info.DoesNotExist):
+            account.billing_info.refresh_from_db()  # well deleted in DB
+
+
 
     def test_modelify_subscription(self):
 
@@ -193,6 +202,7 @@ class AccountModelTest(BaseTest):
 
         assert isinstance(subscription.updated_at, datetime.datetime)
         assert isinstance(subscription.current_period_ends_at, datetime.datetime)
+        assert not subscription.account  # NO AUTOLINKING here
 
         remote_subscription = subscription.get_remote_subscription()
         remote_subscription.quantity = 3
@@ -201,6 +211,7 @@ class AccountModelTest(BaseTest):
         subscription2 = update_local_subscription_data_from_recurly_resource(remote_subscription)
         assert subscription2.pk == subscription.pk  # "subscription" is outdated though
         assert subscription2.quantity == 3
+        assert not subscription.account
 
         remote_subscription.cancel()  # uses "actionator" urls from XML payload
 
