@@ -10,7 +10,7 @@ import recurly
 
 from django_recurly.provisioning import update_local_account_data_from_recurly_resource, \
     update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code, \
-    create_and_sync_recurly_account, create_and_sync_recurly_subscription
+    create_and_sync_recurly_account, create_and_sync_recurly_subscription, update_account_billing_info
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
@@ -117,6 +117,23 @@ class AccountModelTest(BaseTest):
 
         assert account.subscriptions.count() == len(plan_codes)
         return account
+
+
+    def test_update_billing_info(self):
+        account_input_params = self._get_account_creation_params()
+        account = create_and_sync_recurly_account(
+            account_params=account_input_params,
+            billing_info_params=None
+        )
+        assert not hasattr(account, "billing_info"), account.billing_info
+
+        billing_info_input_params = self._get_billing_info_creation_params()
+        update_account_billing_info(account, billing_info_params=billing_info_input_params)
+
+        assert not hasattr(account, "billing_info"), account.billing_info  # not sync'ed yet
+
+        account = update_local_account_data_from_recurly_resource(account.get_recurly_account())
+        assert account.billing_info.country == "USA"
 
 
     def test_update_local_account_data_from_recurly_resource(self):

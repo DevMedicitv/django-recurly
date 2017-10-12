@@ -3,6 +3,7 @@ import copy
 
 import recurly
 
+from recurly.errors import NotFoundError
 
 from .models import logger, Account, BillingInfo, Subscription
 
@@ -55,6 +56,11 @@ def create_and_sync_recurly_subscription(subscription_params):
     )
 
 
+def update_account_billing_info(account, billing_info_params):
+    recurly_account = account.get_recurly_account()
+    billing_info = recurly.BillingInfo(**billing_info_params)
+    recurly_account.update_billing_info(billing_info)
+    return None
 
 
 def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None):
