@@ -236,11 +236,24 @@ class Account(SaveDirtyModel, TimeStampedModel):
         subscription of the specified type.
         """
         subscriptions = self.get_subscriptions(plan_code=plan_code)
+        return subscriptions[0]
+
+    def get_live_subscription_or_none(self):  # FIXME - test this
+        """
+        A SINGLE live subscription is returned.
+        
+        Errors are raised if there is no or several live subscriptions.
+        """
+        subscriptions = self.subscriptions(manager='live_subscriptions').all()
+
+        # TODO raise error if several subscriptions!!
+        '''
         if len(subscriptions) > 1:
             raise Subscription.MultipleObjectsReturned()
         elif len(subscriptions) == 0:
             raise Subscription.DoesNotExist()
-        return subscriptions[0]
+        '''
+        return subscriptions.first()
 
     def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
