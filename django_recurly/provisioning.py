@@ -19,11 +19,9 @@ def _construct_recurly_account_resource(account_params, billing_info_params=None
         account_params = recurly.Account(**account_params)
 
     if billing_info_params:
-        # no override of existing billing info here
-        assert not getattr(account_params, "billing_info", None), account_params
         if not isinstance(billing_info_params, recurly.BillingInfo):
             billing_info = recurly.BillingInfo(**billing_info_params)
-            account_params.billing_info = billing_info
+        account_params.billing_info = billing_info  # OVERRIDE
 
     return account_params
 
@@ -54,6 +52,8 @@ def create_and_sync_recurly_account(account_params, billing_info_params=None):
 def create_and_sync_recurly_subscription(subscription_params, account_params, billing_info_params=None):
     """
     Returns a LOCAL Subscription instance.
+
+    The billing_info_params, if present, will override existing billing info.
 
     Beware, this newly created Subscription will not be
     automatically attached to a corresponding django Account instance.

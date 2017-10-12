@@ -19,8 +19,8 @@ from django_recurly.models import *
 
 class AccountModelTest(BaseTest):
 
-    def _get_billing_info_creation_params(self):
-        return dict(
+    def _get_billing_info_creation_params(self, **kwargs):
+        res = dict(
             first_name = "jane_billing",
             last_name = "doe_billing",
 
@@ -50,6 +50,8 @@ class AccountModelTest(BaseTest):
             # If billing_type paypal
             ###paypal_billing_agreement_id = "2836375363",
         )
+        res.update(kwargs)
+        return res
 
     def _get_account_creation_params(self):
         return dict(
@@ -287,8 +289,10 @@ class AccountModelTest(BaseTest):
 
         subscription_params = self._get_subscription_creation_params(plan_code="gift-3-months")
 
+        billing_info_params = self._get_billing_info_creation_params(last_name="NewDoeBilling")
         new_subscription = create_and_sync_recurly_subscription(
             account_params=account.get_recurly_account(), # linked to same Account as others
+            billing_info_params=billing_info_params,  # OVERRIDE
             subscription_params=subscription_params
         )
 
@@ -298,6 +302,7 @@ class AccountModelTest(BaseTest):
 
         __account = update_full_local_data_for_account_code(account_code=_account.account_code)
         assert __account.pk == account.pk
+        assert __account.billing_info.last_name == "NewDoeBilling"
 
         subscription_uuids2 = [x.uuid for x in account.subscriptions.all()]
         assert account.subscriptions.count() == 3
