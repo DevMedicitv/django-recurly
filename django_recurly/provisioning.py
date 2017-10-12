@@ -1,4 +1,6 @@
 
+import copy
+
 import recurly
 
 
@@ -6,29 +8,35 @@ from .models import logger, Account, BillingInfo, Subscription
 
 
 
-def create_and_sync_recurly_account(**kwargs):
+def create_and_sync_recurly_account(account_params, billing_info_params=None):
     """
-    Returns a LOCAL Account instance.
+    Creates a remote recurly Account, with a BillingInfo if provided.
+
+    Returns a LOCAL Account instance (maybe with BillingInfo) sync'ed with remote.
     """
 
-    # FIXME - remove this magic!?
-    # Make sure billing_info is a Recurly BillingInfo resource
-    billing_info = kwargs.pop('billing_info', None)
-    if billing_info and not isinstance(billing_info, recurly.BillingInfo):
-        billing_info = dict(billing_info)
-        kwargs['billing_info'] = recurly.BillingInfo(**billing_info)
+    assert "billing_info" not in account_params, account_params
 
-    recurly_account = recurly.Account(**kwargs)
+    if billing_info_params:
+        account_params = copy.deepcopy(account_params)  # do not touch input object
+        billing_info = recurly.BillingInfo(**billing_info_params)
+        account_params['billing_info'] = billing_info
+
+    recurly_account = recurly.Account(**account_params)
     recurly_account.save()  # WS API call
 
+    # FULL RELOAD because recurly APi client refresh is damn buggy
+    recurly_account = recurly.Account.get(recurly_account.account_code)
+    '''
     if 'billing_info' in recurly_account.__dict__:
         # UGLY bug, some attributes like this are not updated by resource.update_from_element()
         del recurly_account.__dict__["billing_info"]
+    '''
+    local_account = update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
+    return local_account
 
-    return update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
 
-
-def create_and_sync_recurly_subscription(**kwargs):
+def create_and_sync_recurly_subscription(subscription_params):
     """
     Returns a LOCAL Subscription instance.
 
@@ -36,8 +44,11 @@ def create_and_sync_recurly_subscription(**kwargs):
     automatically attached to a corresponding django Account instance.
     """
 
-    recurly_subscription = recurly.Subscription(**kwargs)
+    recurly_subscription = recurly.Subscription(**subscription_params)
     recurly_subscription.save()
+
+    # FULL RELOAD because recurly APi client refresh is damn buggy
+    recurly_subscription = recurly.Subscription.get(recurly_subscription.uuid)
 
     return update_local_subscription_data_from_recurly_resource(
         recurly_subscription=recurly_subscription
