@@ -8,22 +8,36 @@ from recurly.errors import NotFoundError
 from .models import logger, Account, BillingInfo, Subscription
 
 
+def _construct_recurly_account_resource(account_params, billing_info_params=None):
+    """
+    Might modify "account_params" object.
+
+    Returns UNSAVED instance.
+    """
+
+    if not isinstance(account_params, recurly.Account):
+        account_params = recurly.Account(**account_params)
+
+    if billing_info_params:
+        # no override of existing billing info here
+        assert not getattr(account_params, "billing_info", None), account_params
+        if not isinstance(billing_info_params, recurly.BillingInfo):
+            billing_info = recurly.BillingInfo(**billing_info_params)
+            account_params.billing_info = billing_info
+
+    return account_params
+
 
 def create_and_sync_recurly_account(account_params, billing_info_params=None):
     """
     Creates a remote recurly Account, with a BillingInfo if provided.
 
-    Returns a LOCAL Account instance (maybe with BillingInfo) sync'ed with remote.
+    Returns a LOCAL Account instance (maybe with BillingInfo), sync'ed with remote.
     """
 
-    assert "billing_info" not in account_params, account_params
+    recurly_account = _construct_recurly_account_resource(account_params,
+                                                          billing_info_params=billing_info_params)
 
-    if billing_info_params:
-        account_params = copy.deepcopy(account_params)  # do not touch input object
-        billing_info = recurly.BillingInfo(**billing_info_params)
-        account_params['billing_info'] = billing_info
-
-    recurly_account = recurly.Account(**account_params)
     recurly_account.save()  # WS API call
 
     # FULL RELOAD because recurly APi client refresh is damn buggy
@@ -37,13 +51,20 @@ def create_and_sync_recurly_account(account_params, billing_info_params=None):
     return local_account
 
 
-def create_and_sync_recurly_subscription(subscription_params):
+def create_and_sync_recurly_subscription(subscription_params, account_params, billing_info_params=None):
     """
     Returns a LOCAL Subscription instance.
 
     Beware, this newly created Subscription will not be
     automatically attached to a corresponding django Account instance.
     """
+
+    assert "account" not in subscription_params, subscription_params
+    recurly_account = _construct_recurly_account_resource(account_params,
+                                                          billing_info_params=billing_info_params)
+
+    subscription_params = copy.deepcopy(subscription_params)  # do not touch input object
+    subscription_params["account"] = recurly_account
 
     recurly_subscription = recurly.Subscription(**subscription_params)
     recurly_subscription.save()
@@ -56,6 +77,7 @@ def create_and_sync_recurly_subscription(subscription_params):
     )
 
 
+# FIXME - weird local/distant behaviour ?
 def update_account_billing_info(account, billing_info_params):
     recurly_account = account.get_recurly_account()
     billing_info = recurly.BillingInfo(**billing_info_params)

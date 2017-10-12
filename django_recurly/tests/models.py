@@ -68,16 +68,9 @@ class AccountModelTest(BaseTest):
             ## IGNORED hosted_login_token = "888666555",
         )
 
-    def _get_subscription_creation_params(self, recurly_account=None, plan_code="premium-monthly"):
+    def _get_subscription_creation_params(self, plan_code="premium-monthly"):
 
-        # nested structures must be real objects here
-        recurly_account = recurly_account or recurly.Account(**self._get_account_creation_params())
-        assert isinstance(recurly_account, recurly.Account), recurly_account
-        recurly_account.billing_info = recurly.BillingInfo(**self._get_billing_info_creation_params())
-
-        params = dict(
-
-            account = recurly_account,
+        subscription_params = dict(
 
             currency = "EUR",
 
@@ -90,7 +83,18 @@ class AccountModelTest(BaseTest):
             # here gift card, coupon code, addresse etc. can be added
 
         )
-        return params
+        return subscription_params
+
+
+    def _get_full_subscription_creation_params(self, **kwargs):
+        """
+        Returns a params dict with nested account/billing/subscription parameters.
+        """
+        return dict(
+            account_params=self._get_account_creation_params(),
+            billing_info_params=self._get_billing_info_creation_params(),
+            subscription_params = self._get_subscription_creation_params(**kwargs),
+        )
 
 
 
@@ -109,9 +113,11 @@ class AccountModelTest(BaseTest):
             recurly_account = account.get_recurly_account()
             subscription_params = self._get_subscription_creation_params(
                 plan_code=plan_code,
-                recurly_account=recurly_account
             )
-            subscription = create_and_sync_recurly_subscription(subscription_params=subscription_params)
+            subscription = create_and_sync_recurly_subscription(
+                subscription_params=subscription_params,
+                account_params=recurly_account,
+            )
             assert not subscription.account  # no auto-linking
             account.subscriptions.add(subscription)
 
@@ -228,15 +234,12 @@ class AccountModelTest(BaseTest):
 
     def test_update_local_subscription_data_from_recurly_resource(self):
 
-        subscription_params = self._get_subscription_creation_params()
-
+        meta_params = self._get_full_subscription_creation_params()
         subscription = create_and_sync_recurly_subscription(
-            subscription_params=subscription_params
+            **meta_params
         )
 
-        for (key, input_value) in sorted(subscription_params.items()):
-            if key in ["account"]:
-                continue  # not automatically handled, actually
+        for (key, input_value) in sorted(meta_params["subscription_params"].items()):
             model_value = getattr(subscription, key)
             assert model_value == input_value
 
@@ -275,18 +278,19 @@ class AccountModelTest(BaseTest):
 
         # we modify remote recurly state
 
-        subscription_params = self._get_subscription_creation_params()
-        rogue_subscription = create_and_sync_recurly_subscription(subscription_params=subscription_params)  # has different Account
+        meta_params = self._get_full_subscription_creation_params()
+        rogue_subscription = create_and_sync_recurly_subscription(**meta_params)  # has different Account
         rogue_subscription.account = account  # we introduce incoherence
         rogue_subscription.save()
 
         assert account.subscriptions.count() == 3
 
-        subscription_params = self._get_subscription_creation_params(
-            plan_code="gift-3-months",
-            recurly_account=account.get_recurly_account()
+        subscription_params = self._get_subscription_creation_params(plan_code="gift-3-months")
+
+        new_subscription = create_and_sync_recurly_subscription(
+            account_params=account.get_recurly_account(), # linked to same Account as others
+            subscription_params=subscription_params
         )
-        new_subscription = create_and_sync_recurly_subscription(subscription_params)  # same Account as others
 
         _subscription.get_recurly_subscription().terminate(refund='partial')
 
