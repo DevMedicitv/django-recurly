@@ -57,10 +57,10 @@ class ActiveAccountManager(models.Manager):
         return super(ActiveAccountManager, self).get_query_set().filter(state="active")
 
 
-class CurrentSubscriptionManager(models.Manager):
+class LiveSubscriptionsManager(models.Manager):
     def get_query_set(self):
         # we returns LIVE subscriptions, i.e. not 'expired' or 'future'
-        return (super(CurrentSubscriptionManager, self).get_query_set()
+        return (super(LiveSubscriptionsManager, self).get_query_set()
                 .filter(Q(state__in=("active", "canceled"))))
 
 
@@ -131,7 +131,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
         ("closed", "Closed"),         # Account has been closed
     )
 
-    # FIXME - rename as 'recurly_accounts', else put a one-to-one relationship instead
+    # BEWARE - no cascading, because remote recurly accounts must be CLOSED first
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_accounts",
                              on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
@@ -225,9 +225,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
         though recurly prevent multiple ACTIVE subscriptions on the same `plan_code`.
         """
         if plan_code is not None:
-            return Subscription.current.filter(account=self, plan_code=plan_code)
+            return Subscription.live_subscriptions.filter(account=self, plan_code=plan_code)
         else:
-            return Subscription.current.filter(account=self)
+            return Subscription.live_subscriptions.filter(account=self)
 
     def __get_subscription(self, plan_code=None):
         """Get current subscription of type `plan_code` for this Account.
@@ -264,8 +264,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         BillingInfo.sync_billing_info(account_code=self.account_code)
 
     def __close(self):
-        recurly_account = self.get_account()
-        recurly_account.delete()
+        recurly_account = self.get_recurly_account()
+        recurly_account.close()
 
         self.sync(recurly_account)
 
@@ -484,7 +484,7 @@ class Subscription(SaveDirtyModel):
     xml = models.TextField(**BLANKABLE_FIELD_ARGS)
 
     objects = models.Manager()
-    current = CurrentSubscriptionManager()
+    live_subscriptions = LiveSubscriptionsManager()
 
     class Meta:
         ordering = ["-id"]
