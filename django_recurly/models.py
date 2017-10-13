@@ -816,6 +816,20 @@ class Token(TimeStampedModel):
 
 
 
+class GiftCardMemo(TimeStampedModel):
+    """
+    The only purpose of this table is to remember how many months a gift card
+    is equivalent to, when it's purchased.
+
+    The target "plan code" is supposed
+    to be a fixed-length, non-renewable premium subscription whose pricing
+    will be set equal to the gift card value, when redeeming occurs.
+    """
+    gift_card_id = models.CharField(max_length=50, unique=True)
+    target_plan_code = models.CharField(max_length=50)
+
+
+
 # Connect model signal handlers
 ''' DISABLED ATM BECAUSE UNTESTED
 
