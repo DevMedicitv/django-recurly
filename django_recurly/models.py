@@ -135,6 +135,10 @@ class Account(SaveDirtyModel, TimeStampedModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_accounts",
                              on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
 
+    # This field can be used to enforce periodic auto-sync of users,
+    # eg. in case account has been modified from recurly console and no webhook was used
+    last_provisioning_sync = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+
     account_code = models.CharField(max_length=50, unique=True)
 
     state = models.CharField(max_length=20, default="active", choices=ACCOUNT_STATES)
