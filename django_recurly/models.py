@@ -174,7 +174,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         user_id = self.user_id
         user_model = get_user_model()
         if user_id:
-            return user_model.object.get(pk=user_id)  # might raise DoesNotExist
+            # might raise DoesNotExist if serious desync
+            return user_model.objects.get(pk=user_id)
         return None
 
 
