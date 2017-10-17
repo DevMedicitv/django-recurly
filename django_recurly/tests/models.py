@@ -10,7 +10,8 @@ import recurly
 
 from django_recurly.provisioning import update_local_account_data_from_recurly_resource, \
     update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code, \
-    create_and_sync_recurly_account, create_and_sync_recurly_subscription, update_account_billing_info
+    create_and_sync_recurly_account, create_and_sync_recurly_subscription, update_account_billing_info, \
+    update_and_sync_recurly_subscription
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
@@ -249,15 +250,13 @@ class AccountModelTest(BaseTest):
         assert isinstance(subscription.current_period_ends_at, datetime.datetime)
         assert not subscription.account  # NO AUTOLINKING here
 
-        remote_subscription = subscription.get_recurly_subscription()
-        remote_subscription.quantity = 3
-        remote_subscription.save()
+        subscription2 = update_and_sync_recurly_subscription(subscription, dict(quantity=3))
 
-        subscription2 = update_local_subscription_data_from_recurly_resource(remote_subscription)
         assert subscription2.pk == subscription.pk  # "subscription" is outdated though
         assert subscription2.quantity == 3
         assert not subscription.account
 
+        remote_subscription = subscription2.get_recurly_subscription()
         remote_subscription.cancel()  # uses "actionator" urls from XML payload
 
         subscription3 = update_local_subscription_data_from_recurly_resource(remote_subscription)

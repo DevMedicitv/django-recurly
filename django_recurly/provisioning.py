@@ -71,7 +71,25 @@ def create_and_sync_recurly_subscription(subscription_params, account_params, bi
 
     # FULL RELOAD because recurly APi client refresh is damn buggy
     recurly_subscription = recurly.Subscription.get(recurly_subscription.uuid)
+    return update_local_subscription_data_from_recurly_resource(
+        recurly_subscription=recurly_subscription
+    )
 
+
+def update_and_sync_recurly_subscription(subscription, subscription_params):
+    """
+    Gets and returns a LOCAL Subscription instance.
+    """
+    assert isinstance(subscription, Subscription), subscription
+
+    recurly_subscription = subscription.get_recurly_subscription()
+
+    for (k, v) in subscription_params.items():
+        setattr(recurly_subscription, k, v)
+
+    recurly_subscription.save()
+
+    recurly_subscription = recurly.Subscription.get(recurly_subscription.uuid)
     return update_local_subscription_data_from_recurly_resource(
         recurly_subscription=recurly_subscription
     )
