@@ -46,10 +46,6 @@ SITE_ID = 1
 
 ROOT_URLCONF = "django_recurly.urls"
 
-SOUTH_MIGRATION_MODULES = {
-    'django_recurly': 'django_recurly.south_migrations',
-}
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

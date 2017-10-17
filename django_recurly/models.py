@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
@@ -131,9 +132,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         ("closed", "Closed"),         # Account has been closed
     )
 
-    # BEWARE - no cascading, because remote recurly accounts must be CLOSED first
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="recurly_accounts",
-                             on_delete=models.SET_NULL, **BLANKABLE_FIELD_ARGS)
+    # BEWARE - no foreign key, because User model might be in a different DB
+    user_id = models.IntegerField(**BLANKABLE_FIELD_ARGS)
 
     # This field can be used to enforce periodic auto-sync of users,
     # eg. in case account has been modified from recurly console and no webhook was used
@@ -168,6 +168,15 @@ class Account(SaveDirtyModel, TimeStampedModel):
     class Meta:
         ordering = ["-id"]
         get_latest_by = "id"
+
+    @property
+    def user(self):
+        user_id = self.user_id
+        user_model = get_user_model()
+        if user_id:
+            return user_model.object.get(pk=user_id)  # might raise DoesNotExist
+        return None
+
 
     def save(self, *args, **kwargs):
         ''' NOPE NOT HERE
@@ -385,12 +394,12 @@ class BillingInfo(SaveDirtyModel):
     state = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
     zip = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
-    country = models.CharField(max_length=2, **BLANKABLE_CHARFIELD_ARGS)
+    country = models.CharField(max_length=5, **BLANKABLE_CHARFIELD_ARGS)
     phone = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
     vat_number = models.CharField(max_length=16, **BLANKABLE_CHARFIELD_ARGS)
     ip_address = models.GenericIPAddressField(**BLANKABLE_FIELD_ARGS)
-    ip_address_country = models.CharField(max_length=2, **BLANKABLE_CHARFIELD_ARGS)
+    ip_address_country = models.CharField(max_length=5, **BLANKABLE_CHARFIELD_ARGS)
 
     # If billing_type credit_card
     card_type = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
