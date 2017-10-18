@@ -19,7 +19,9 @@ def _construct_recurly_account_resource(account_params, billing_info_params=None
         account_params = recurly.Account(**account_params)
 
     if billing_info_params:
-        if not isinstance(billing_info_params, recurly.BillingInfo):
+        if isinstance(billing_info_params, recurly.BillingInfo):
+            billing_info = billing_info_params
+        else:
             billing_info = recurly.BillingInfo(**billing_info_params)
         account_params.billing_info = billing_info  # OVERRIDE
 

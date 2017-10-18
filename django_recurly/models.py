@@ -62,7 +62,7 @@ class LiveSubscriptionsManager(models.Manager):
     def get_query_set(self):
         # we returns LIVE subscriptions, i.e. not 'expired' or 'future'
         return (super(LiveSubscriptionsManager, self).get_query_set()
-                .filter(Q(state__in=("active", "canceled"))))
+                .filter(Q(state__in=Subscription.LIVE_STATES)))
 
 
 class SaveDirtyModel(models.Model):
@@ -258,7 +258,10 @@ class Account(SaveDirtyModel, TimeStampedModel):
         
         Errors are raised if there is no or several live subscriptions.
         """
-        subscriptions = self.subscriptions(manager='live_subscriptions').all()
+
+        # BUGGY: self.subscriptions(manager='live_subscriptions').get_queryset() doesn't work
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES)
+        subscriptions = queryset.all()
 
         # TODO raise error if several subscriptions!!
         '''
@@ -480,6 +483,8 @@ class Subscription(SaveDirtyModel):
         ("canceled", "Canceled"),     # Still active, but will not be renewed
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
     )
+
+    LIVE_STATES = ("active", "canceled")  # subscriptions granting premium NOW
 
     account = models.ForeignKey(Account, related_name="subscriptions", **BLANKABLE_FIELD_ARGS)
 
