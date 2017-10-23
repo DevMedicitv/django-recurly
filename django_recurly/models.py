@@ -478,7 +478,7 @@ class Subscription(SaveDirtyModel):
     UNIQUE_LOOKUP_FIELD = "uuid"
 
     SUBSCRIPTION_STATES = (
-        ("future", "Future"),  # Will become active after a date
+        ("future", "Future"),         # Will become active after a date
         ("active", "Active"),         # Active and everything is fine
         ("canceled", "Canceled"),     # Still active, but will not be renewed
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
@@ -493,7 +493,7 @@ class Subscription(SaveDirtyModel):
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
 
     plan_code = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
-    plan_name = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
+    plan_name = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)  # FIXME, not well updated??
 
     unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")
@@ -535,10 +535,22 @@ class Subscription(SaveDirtyModel):
 
         super(Subscription, self).save(*args, **kwargs)
 
-    def __is_canceled(self):
+
+    @property
+    def is_live(self):
+        return self.state in self.LIVE_STATES
+
+    @property
+    def is_canceled(self):
         return self.state == 'canceled'
 
-    def __is_current(self):
+    @property
+    def is_cancellable(self):
+        return self.state in ('future', 'active')
+
+
+    @property
+    def ___is_current(self):
         """Is this subscription current (i.e. not 'expired')
 
         Note that 'canceled' subscriptions are actually still considered
@@ -546,7 +558,9 @@ class Subscription(SaveDirtyModel):
         the current billing period (at which point Recurly will tell us that
         they are 'expired')
         """
-        return self.state != 'expired'
+        res = (self.is_live or self.state == "future")
+        assert res == (self.state != "expired")  # safety check
+        return res
 
     def __is_trial(self):
         if not self.trial_started_at or not self.trial_ends_at:

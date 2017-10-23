@@ -241,6 +241,10 @@ class AccountModelTest(BaseTest):
             **meta_params
         )
 
+        assert subscription.is_live
+        assert not subscription.is_canceled
+        assert subscription.is_cancellable
+
         for (key, input_value) in sorted(meta_params["subscription_params"].items()):
             model_value = getattr(subscription, key)
             assert model_value == input_value
@@ -262,6 +266,20 @@ class AccountModelTest(BaseTest):
         assert subscription3.pk == subscription2.pk  # "subscription2" is outdated though
         assert subscription3.state == "canceled"
 
+        assert subscription3.is_live
+        assert subscription3.is_canceled
+        assert not subscription3.is_cancellable
+
+        remote_subscription = subscription3.get_recurly_subscription()
+        remote_subscription.terminate(refund='none')  # uses "actionator" urls from XML payload
+
+        subscription4 = update_local_subscription_data_from_recurly_resource(remote_subscription)
+        assert subscription4.pk == subscription3.pk  # "subscription3" is outdated though
+        assert subscription4.state == "expired"
+
+        assert not subscription4.is_live
+        assert not subscription4.is_canceled
+        assert not subscription4.is_cancellable
 
 
     def test_update_full_local_data_for_account_code(self):
