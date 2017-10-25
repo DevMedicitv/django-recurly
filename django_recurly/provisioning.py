@@ -28,6 +28,8 @@ def _construct_recurly_account_resource(account_params, billing_info_params=None
     return account_params
 
 
+
+
 def create_and_sync_recurly_account(account_params, billing_info_params=None):
     """
     Creates a remote recurly Account, with a BillingInfo if provided.
@@ -88,7 +90,7 @@ def create_and_sync_recurly_subscription(subscription_params, account_params, bi
     recurly_subscription = recurly.Subscription(**subscription_params)
     recurly_subscription.save()
 
-    # FULL RELOAD because recurly APi client refresh is damn buggy
+    # FULL RELOAD because recurly API client refresh is damn buggy
     recurly_subscription = recurly.Subscription.get(recurly_subscription.uuid)
     return update_local_subscription_data_from_recurly_resource(
         recurly_subscription=recurly_subscription
