@@ -276,8 +276,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
 
-    def __get_invoices(self):
-        return self.get_account().invoices
+    def get_recurly_invoices(self):
+        return self.get_recurly_account().invoices()
 
     def __get_transactions(self):
         try:
