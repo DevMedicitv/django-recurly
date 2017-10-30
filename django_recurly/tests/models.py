@@ -34,10 +34,10 @@ class AccountModelTest(BaseTest):
             state = "Mississipi",
 
             zip = "68998",
-            country = "USA",
+            country = "FR",
             phone = "0123456789",
 
-            vat_number = "US118822",
+            vat_number = "FR118822",  # gets prepended country, if not identical
             ip_address = "99.77.22.33",
             #ip_address_country = "France", -> only set by Recurly
 
@@ -141,7 +141,7 @@ class AccountModelTest(BaseTest):
         assert account.pk == account2.pk
 
         assert not hasattr(account, "billing_info"), account.billing_info  # not sync'ed
-        assert account2.billing_info.country == "USA"  # well sync'ed
+        assert account2.billing_info.country == "FR"  # well sync'ed
 
 
     def test_update_local_account_data_from_recurly_resource(self):

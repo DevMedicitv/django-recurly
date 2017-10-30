@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
+from django_recurly import monkey  # patches recurly client
 from django_recurly import conf
 from django_recurly.utils import recurly
 # Do these here to ensure the handlers get hooked up
