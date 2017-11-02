@@ -410,8 +410,7 @@ class BillingInfo(SaveDirtyModel):
     card_type = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     month = models.IntegerField(**BLANKABLE_FIELD_ARGS)
     year = models.IntegerField(**BLANKABLE_FIELD_ARGS)
-    first_six = models.IntegerField(**BLANKABLE_FIELD_ARGS)
-    last_four = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    last_four = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # not "first_six" too, it'd be too much info
 
     # If billing_type paypal
     paypal_billing_agreement_id = models.CharField(max_length=100, **BLANKABLE_CHARFIELD_ARGS)
