@@ -178,7 +178,7 @@ class AccountModelTest(BaseTest):
                 continue  # of course card number isn't directly reflected
             model_value = getattr(billing_info, key)
             assert model_value == input_value
-        assert billing_info.first_six == "411111"
+        assert not hasattr(billing_info, "first_six")  # not stored anymore
         assert billing_info.last_four == "1111"
 
         #print("SUBSCRIPTIONS", account.subscriptions)
