@@ -484,6 +484,11 @@ class Subscription(SaveDirtyModel):
         ("expired", "Expired"),       # Did not renew, or was forcibly expired
     )
 
+    COLLECTION_METHODS = (
+        ('automatic', 'Automatic'),
+        ('manual', 'Manual')
+    )
+
     LIVE_STATES = ("active", "canceled")  # subscriptions granting premium NOW
 
     account = models.ForeignKey(Account, related_name="subscriptions", **BLANKABLE_FIELD_ARGS)
@@ -510,6 +515,8 @@ class Subscription(SaveDirtyModel):
     current_period_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     trial_started_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     trial_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
+    collection_method = models.CharField(max_length=20, default='automatic', choices=COLLECTION_METHODS)
+
 
     # TODO - add fields for taxes, addons, gifts, terms etc?
 
