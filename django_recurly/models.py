@@ -585,13 +585,12 @@ class Subscription(SaveDirtyModel):
         # TODO: (IW) Cache/store subscription object
         return recurly.Subscription.get(self.uuid)
 
-    def get_pending_subscription(self):
-        recurly_pending_subscription = recurly.Subscription.get(self.uuid).pending_subscription
+    def get_pending_subscription_or_none(self):
+        recurly_subscription = self.get_recurly_subscription()
+        recurly_pending_subscription = getattr(recurly_subscription, "pending_subscription", None)
         if recurly_pending_subscription:
-            pending_subscription = Subscription(
-                plan_code=recurly_pending_subscription.plan_code,
-                unit_amount_in_cents=recurly_pending_subscription.unit_amount_in_cents
-            )
+            from django_recurly.provisioning import modelify
+            pending_subscription = modelify(recurly_pending_subscription, Subscription, save=False)
             return pending_subscription
         return None
 

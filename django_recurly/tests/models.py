@@ -327,6 +327,32 @@ class AccountModelTest(BaseTest):
         assert set(subscription_uuids2) == set(subscription_uuids) | {new_subscription.uuid}
 
 
+    def test_get_pending_subscription_or_none(self):
+
+        account = self._create_recurly_test_account(plan_codes=["premium-annual"])
+        subscription = account.get_live_subscription_or_none()
+        assert subscription
+        assert subscription.plan_code == "premium-annual"
+
+        pending = subscription.get_pending_subscription_or_none()
+        assert pending is None
+
+        subscription_params = dict(
+            timeframe="renewal",
+            plan_code="premium-monthly",
+            quantity=1,
+        )
+        subscription = update_and_sync_recurly_subscription(subscription, subscription_params)
+        assert subscription
+        assert subscription.plan_code == "premium-annual"  # unchanged yet
+
+        pending = subscription.get_pending_subscription_or_none()
+        assert pending
+        assert pending.plan_code == "premium-monthly"
+        assert pending.quantity == 1
+        assert pending.current_period_ends_at is None
+        assert pending.state == "active"  # weird but not "future"
+
 
 '''
     # ------------------------------------- BROKEN STUFFS BELOW

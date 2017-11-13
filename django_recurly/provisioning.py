@@ -116,11 +116,11 @@ def update_and_sync_recurly_subscription(subscription, subscription_params):
     )
 
 
-def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None):
+def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None, save=True):
     """
     Convert recurly resource objects to django models, by creating new instances or updating existing ones.
 
-    Saves immediately the models created/updated.
+    Saves immediately the models created/updated, unless save=False if given.
     """
 
     __old = '''Modelify handles the dirty work of converting Recurly Resource objects to
@@ -211,6 +211,9 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
         logger.debug("Using already provided %s instance with id=%s for update",
                      model_class.__name__, existing_instance.pk)
 
+    elif not save:
+        pass  # no unicity problem, just a transient object
+
     elif model_class.UNIQUE_LOOKUP_FIELD:
 
         if not model_updates.get(model_class.UNIQUE_LOOKUP_FIELD):
@@ -242,7 +245,8 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
 
     if presave_callback:
         presave_callback(obj)
-    obj.save()  # sets primary key if not present
+    if save:
+        obj.save()  # sets primary key if not present
 
     for (relation, subsinstance_klass) in SUBMODEL_MAPPER.items():
 
@@ -276,6 +280,8 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
                               existing_instance=local_subinstance,
                               presave_callback=_new_presave_callback)
             setattr(obj, relation, subobj)  # might be a NO-OP here
+            if save:
+                obj.save()  # just in case
         else:
             assert not remote_subresource
             if local_subinstance:
