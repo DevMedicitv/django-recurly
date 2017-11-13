@@ -1,2 +1,0 @@
-django>=1.4.1
--e git://github.com/sprintly/recurly-client-python.git#egg=recurly
