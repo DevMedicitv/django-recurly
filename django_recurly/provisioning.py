@@ -116,7 +116,6 @@ def update_and_sync_recurly_subscription(subscription, subscription_params):
     )
 
 
-
 def modelify(resource, model_class, existing_instance=None, remove_empty=False, presave_callback=None):
     """
     Convert recurly resource objects to django models, by creating new instances or updating existing ones.

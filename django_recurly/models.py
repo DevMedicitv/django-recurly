@@ -16,6 +16,7 @@ from django_recurly import handlers
 from django.db.models.signals import post_save
 import importlib
 
+
 import logging, sys
 logger = logging.getLogger(__name__)
 
@@ -584,10 +585,19 @@ class Subscription(SaveDirtyModel):
         # TODO: (IW) Cache/store subscription object
         return recurly.Subscription.get(self.uuid)
 
+    def get_pending_subscription(self):
+        recurly_pending_subscription = recurly.Subscription.get(self.uuid).pending_subscription
+        if recurly_pending_subscription:
+            pending_subscription = Subscription(
+                plan_code=recurly_pending_subscription.plan_code,
+                unit_amount_in_cents=recurly_pending_subscription.unit_amount_in_cents
+            )
+            return pending_subscription
+        return None
+
     def __get_pending_changes(self):
         if self.xml is None:
             return None
-
         try:
             return recurly.Subscription().from_element(self.xml).pending_subscription
         except Exception as e:
