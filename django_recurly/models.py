@@ -135,7 +135,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     )
 
     # BEWARE - no foreign key, because User model might be in a different DB
-    user_id = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    user_id = models.IntegerField(unique=True, **BLANKABLE_FIELD_ARGS)
 
     # This field can be used to enforce periodic auto-sync of users,
     # eg. in case account has been modified from recurly console and no webhook was used
