@@ -518,6 +518,7 @@ class Subscription(SaveDirtyModel):
     trial_ends_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)
     collection_method = models.CharField(max_length=20, default='automatic', choices=COLLECTION_METHODS)
     imported_trial = models.BooleanField(default=False)
+    started_with_gift = models.BooleanField(default=False)
 
 
     # TODO - add fields for taxes, addons, gifts, terms etc?
