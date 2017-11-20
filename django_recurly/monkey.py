@@ -18,3 +18,16 @@ def suberror__str__(self):
 
 recurly.errors.ValidationError.__unicode__ = validationerror__unicode__
 recurly.errors.ValidationError.Suberror.__str__ = suberror__str__
+
+
+def __getpath_fixed__(self, name):
+    if name == 'plan_code':
+        return 'plan/plan_code'
+    elif name == 'plan_name':
+        return 'plan/name'
+    else:
+        return name
+
+assert recurly.Subscription.__getpath__
+recurly.Subscription.__getpath__ = __getpath_fixed__
+recurly.Subscription.attributes += ("plan_name",)

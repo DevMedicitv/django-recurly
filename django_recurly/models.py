@@ -499,7 +499,7 @@ class Subscription(SaveDirtyModel):
     state = models.CharField(max_length=20, default="active", choices=SUBSCRIPTION_STATES)
 
     plan_code = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
-    plan_name = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)  # FIXME, not well updated??
+    plan_name = models.CharField(max_length=60, **BLANKABLE_CHARFIELD_ARGS)
 
     unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)  # Not always in cents (i8n)!
     currency = models.CharField(max_length=3, default="USD")

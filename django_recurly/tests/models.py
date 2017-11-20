@@ -244,6 +244,8 @@ class AccountModelTest(BaseTest):
         assert subscription.is_live
         assert not subscription.is_canceled
         assert subscription.is_cancellable
+        assert subscription.plan_code == "premium-monthly"
+        assert subscription.plan_name == "Premium Monthly"
 
         for (key, input_value) in sorted(meta_params["subscription_params"].items()):
             model_value = getattr(subscription, key)
