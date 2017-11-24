@@ -158,7 +158,8 @@ class AccountModelTest(BaseTest):
                                     for (key, input_value) in account_input_params.items())
         print("FINAL MODEL FIELDS", account_model_fields)
 
-        assert not hasattr(account.get_recurly_account(), "tax_exempt") # ABNORMAL
+        # missed when not configured in recurly console
+        assert hasattr(account.get_recurly_account(), "tax_exempt")
 
         # Check that local Account model has been properly updated by WS output
         for (key, input_value) in sorted(account_input_params.items()):
@@ -245,7 +246,7 @@ class AccountModelTest(BaseTest):
         assert not subscription.is_canceled
         assert subscription.is_cancellable
         assert subscription.plan_code == "premium-monthly"
-        assert subscription.plan_name == "Premium Monthly"
+        assert subscription.plan_name == "PREMIUM Monthly"
 
         for (key, input_value) in sorted(meta_params["subscription_params"].items()):
             model_value = getattr(subscription, key)
