@@ -158,8 +158,8 @@ class AccountModelTest(BaseTest):
                                     for (key, input_value) in account_input_params.items())
         print("FINAL MODEL FIELDS", account_model_fields)
 
-        # missed when not configured in recurly console
-        assert hasattr(account.get_recurly_account(), "tax_exempt")
+        # missing when not configured in recurly console
+        assert not hasattr(account.get_recurly_account(), "tax_exempt")
 
         # Check that local Account model has been properly updated by WS output
         for (key, input_value) in sorted(account_input_params.items()):
@@ -356,6 +356,11 @@ class AccountModelTest(BaseTest):
         assert pending.current_period_ends_at is None
         assert pending.state == "active"  # weird but not "future"
 
+
+    def ___test_plan_currencies(self):
+        plan = recurly.Plan.get("test-plan")
+        print(">>>>>>", plan.unit_amount_in_cents.currencies)
+        #addbreakage
 
 '''
     # ------------------------------------- BROKEN STUFFS BELOW
