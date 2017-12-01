@@ -90,11 +90,13 @@ def create_and_sync_recurly_subscription(subscription_params, account_params, bi
     recurly_subscription = recurly.Subscription(**subscription_params)
     recurly_subscription.save()
 
-    # FULL RELOAD because recurly API client refresh is damn buggy
-    recurly_subscription = recurly.Subscription.get(recurly_subscription.uuid)
-    return update_local_subscription_data_from_recurly_resource(
-        recurly_subscription=recurly_subscription
-    )
+    # FULL RELOAD because lots of stuffs may have changed, and recurly API client refresh is damn buggy
+    account = update_full_local_data_for_account_code(account_code=recurly_account.account_code)
+    assert account.subscriptions.count()
+
+    subscription = account.subscriptions.filter(uuid=recurly_subscription.uuid).first()
+    assert subscription
+    return subscription
 
 
 def update_and_sync_recurly_subscription(subscription, subscription_params):

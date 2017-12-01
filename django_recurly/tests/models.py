@@ -120,8 +120,7 @@ class AccountModelTest(BaseTest):
                 subscription_params=subscription_params,
                 account_params=recurly_account,
             )
-            assert not subscription.account  # no auto-linking
-            account.subscriptions.add(subscription)
+            assert subscription.account  # good auto-linking
 
         assert account.subscriptions.count() == len(plan_codes)
         return account
@@ -242,6 +241,9 @@ class AccountModelTest(BaseTest):
             **meta_params
         )
 
+        billing_info = subscription.account.billing_info  # well sync'ed
+        assert billing_info.company == "my_billed_company"
+
         assert subscription.is_live
         assert not subscription.is_canceled
         assert subscription.is_cancellable
@@ -254,13 +256,13 @@ class AccountModelTest(BaseTest):
 
         assert isinstance(subscription.updated_at, datetime.datetime)
         assert isinstance(subscription.current_period_ends_at, datetime.datetime)
-        assert not subscription.account  # NO AUTOLINKING here
+        assert subscription.account  # good AUTOLINKING here
 
         subscription2 = update_and_sync_recurly_subscription(subscription, dict(quantity=3))
 
         assert subscription2.pk == subscription.pk  # "subscription" is outdated though
         assert subscription2.quantity == 3
-        assert not subscription.account
+        assert subscription2.account
 
         remote_subscription = subscription2.get_recurly_subscription()
         remote_subscription.cancel()  # uses "actionator" urls from XML payload
