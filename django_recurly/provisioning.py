@@ -63,7 +63,7 @@ def update_and_sync_recurly_billing_info(account, billing_info_params):
     recurly_account = account.get_recurly_account()
     billing_info = recurly.BillingInfo(**billing_info_params)
     recurly_account.update_billing_info(billing_info)
-    account.billing_info.purge_payment_mean()
+    account.billing_info.purge_billing_info()
     recurly_account = account.get_recurly_account()  # refresh
     local_account = update_local_account_data_from_recurly_resource(recurly_account=recurly_account)
     return local_account
