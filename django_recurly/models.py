@@ -16,7 +16,6 @@ from django_recurly import handlers
 from django.db.models.signals import post_save
 import importlib
 
-
 import logging, sys
 logger = logging.getLogger(__name__)
 
@@ -472,6 +471,26 @@ class BillingInfo(SaveDirtyModel):
             setattr(self, k, v)
 
         self.save(remote=False)
+
+    def purge_billing_info(self):
+        self.company = None
+        self.address1 = None
+        self.address2 = None
+        self.city = None
+        self.state = None
+        self.zip = None
+        self.country = None
+        self.phone = None
+        self.vat_number = None
+        self.ip_address = None
+        self.ip_address_country = None
+        self.card_type = None
+        self.month = None
+        self.year = None
+        self.last_four = None
+        self.paypal_billing_agreement_id = None
+        self.updated_at = None
+        self.save()
 
 
 class Subscription(SaveDirtyModel):
