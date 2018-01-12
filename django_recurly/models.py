@@ -15,7 +15,8 @@ from django_recurly.utils import recurly
 from django_recurly import handlers
 from django.db.models.signals import post_save
 import importlib
-
+from urllib.parse import urljoin
+from xml.etree import ElementTree
 
 import logging, sys
 logger = logging.getLogger(__name__)
@@ -380,6 +381,23 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         return account, subscription
 
+    def update_billing_info(self, billing_info, account_url):
+        """Change this account's billing information to the given `BillingInfo`."""
+        url = urljoin(account_url, '%s/billing_info' % self.account_code)
+        response = billing_info.http_request(url, 'PUT', billing_info,
+            {'Content-Type': 'application/xml; charset=utf-8'})
+        if response.status == 200:
+            pass
+        elif response.status == 201:
+            billing_info._url = response.getheader('Location')
+        else:
+            billing_info.raise_http_error(response)
+
+        response_xml = response.read()
+        logging.getLogger('recurly.http.response').debug(response_xml)
+        self.billing_info.clear_payment_mean()
+        billing_info.update_from_element(ElementTree.fromstring(response_xml))
+
 
 class BillingInfo(SaveDirtyModel):
 
@@ -472,6 +490,14 @@ class BillingInfo(SaveDirtyModel):
             setattr(self, k, v)
 
         self.save(remote=False)
+
+    def clear_payment_mean(self):
+        self.card_type = None
+        self.month = None
+        self.year = None
+        self.last_four = None
+        self.paypal_billing_agreement_id = None
+        self.save()
 
 
 class Subscription(SaveDirtyModel):
