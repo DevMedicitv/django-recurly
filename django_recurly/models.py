@@ -538,6 +538,7 @@ class Subscription(SaveDirtyModel):
     collection_method = models.CharField(max_length=20, default='automatic', choices=COLLECTION_METHODS)
     imported_trial = models.BooleanField(default=False)
     started_with_gift = models.BooleanField(default=False)
+    legacy_starts_at = models.DateTimeField(**BLANKABLE_FIELD_ARGS)  # by default the same as activated_at, but can be different if subscription imported from legacy
 
 
     # TODO - add fields for taxes, addons, gifts, terms etc?
