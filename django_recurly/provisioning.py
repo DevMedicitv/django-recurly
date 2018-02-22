@@ -372,3 +372,14 @@ def update_full_local_data_for_account_code(account_code):
             subscription.delete()  # remove obsolete subscription
 
     return account
+
+
+
+def add_recurly_account_acquisition_data(acquisition_params):
+    """
+    add acquisition data to a remote recurly account
+    """
+    recurly_account_acquisition = recurly.AccountAcquisition(**acquisition_params)
+    collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, acquisition_params["account_code"])
+    recurly_account_acquisition.collection_path = collection_path
+    recurly_account_acquisition.save()
