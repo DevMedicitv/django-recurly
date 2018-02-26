@@ -381,9 +381,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def get_acquisition_data(self):
         recurly.AccountAcquisition.member_path="accounts/%s/acquisition"
-        acquisition_data = recurly.AccountAcquisition.get(self.account_code)
-        return acquisition_data
-
+        try:
+            acquisition_data = recurly.AccountAcquisition.get(self.account_code)
+            return acquisition_data
+        except recurly.errors.NotFoundError:
+            return None
 
     def set_acquisition_data(self, acquisition_params):
         """
