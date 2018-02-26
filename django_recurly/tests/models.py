@@ -10,7 +10,8 @@ import recurly
 
 from django_recurly.provisioning import update_local_account_data_from_recurly_resource, \
     update_local_subscription_data_from_recurly_resource, update_full_local_data_for_account_code, \
-    create_and_sync_recurly_account, create_and_sync_recurly_subscription, update_and_sync_recurly_billing_info, update_and_sync_recurly_subscription
+    create_and_sync_recurly_account, create_and_sync_recurly_subscription,\
+    update_and_sync_recurly_billing_info, update_and_sync_recurly_subscription
 from django_recurly.tests.base import BaseTest
 from django_recurly.models import *
 
@@ -363,6 +364,20 @@ class AccountModelTest(BaseTest):
         plan = recurly.Plan.get("test-plan")
         print(">>>>>>", plan.unit_amount_in_cents.currencies)
         #addbreakage
+
+    def test_create_account_acquisition_data(self):
+        _account = self._create_recurly_test_account()
+        acquisition_params = dict(
+            channel = "referral",
+            subchannel = "google",
+            campaign = "1234 mozart"
+        )
+        _account.set_acquisition_data(acquisition_params)
+        acquisition_data = _account.get_acquisition_data()
+        assert acquisition_data
+        assert acquisition_data.channel == "referral"
+        assert acquisition_data.subchannel == "google"
+        assert acquisition_data.campaign == "1234 mozart"
 
 '''
     # ------------------------------------- BROKEN STUFFS BELOW

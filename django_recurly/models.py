@@ -379,6 +379,22 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
         return account, subscription
 
+    def get_acquisition_data(self):
+        recurly.AccountAcquisition.member_path="accounts/%s/acquisition"
+        acquisition_data = recurly.AccountAcquisition.get(self.account_code)
+        return acquisition_data
+
+
+    def set_acquisition_data(self, acquisition_params):
+        """
+        add acquisition data to a remote recurly account
+        """
+        acquisition_params['account_code'] = self.account_code
+        recurly_account_acquisition = recurly.AccountAcquisition(**acquisition_params)
+        collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, self.account_code)
+        recurly_account_acquisition.collection_path = collection_path
+        recurly_account_acquisition.save()
+
 
 class BillingInfo(SaveDirtyModel):
 
