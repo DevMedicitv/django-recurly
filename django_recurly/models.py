@@ -381,9 +381,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def get_acquisition_data(self):
         recurly.AccountAcquisition.member_path="accounts/%s/acquisition"
-        acquisition_data = recurly.AccountAcquisition.get(self.account_code)
-        return acquisition_data
-
+        try:
+            acquisition_data = recurly.AccountAcquisition.get(self.account_code)
+            return acquisition_data
+        except recurly.errors.NotFoundError:
+            return None
 
 class BillingInfo(SaveDirtyModel):
 
@@ -597,15 +599,13 @@ class Subscription(SaveDirtyModel):
         assert res == (self.state != "expired")  # safety check
         return res
 
-    def __is_trial(self):
+    def is_in_trial(self):
         if not self.trial_started_at or not self.trial_ends_at:
             return False  # No trial dates, so not a trial
-
         now = timezone.now()
         if self.trial_started_at <= now and self.trial_ends_at > now:
             return True
-        else:
-            return False
+        return False
 
     def get_recurly_subscription(self):
         # TODO: (IW) Cache/store subscription object
