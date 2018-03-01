@@ -30,7 +30,7 @@ def _construct_recurly_account_resource(account_params, billing_info_params=None
 
 
 
-def create_and_sync_recurly_account(account_params, billing_info_params=None):
+def create_and_sync_recurly_account(account_params, billing_info_params=None, acquisition_params=None):
     """
     Creates a remote recurly Account, with a BillingInfo if provided.
 
@@ -41,6 +41,9 @@ def create_and_sync_recurly_account(account_params, billing_info_params=None):
                                                           billing_info_params=billing_info_params)
 
     recurly_account.save()  # WS API call
+
+    if acquisition_params:
+        set_acquisition_data(recurly_account.account_code, acquisition_params)
 
     # FULL RELOAD because recurly APi client refresh is damn buggy
     recurly_account = recurly.Account.get(recurly_account.account_code)
@@ -372,3 +375,14 @@ def update_full_local_data_for_account_code(account_code):
             subscription.delete()  # remove obsolete subscription
 
     return account
+
+
+def set_acquisition_data(account_code, acquisition_params):
+    """
+    add acquisition data to a remote recurly account
+    """
+    acquisition_params['account_code'] = account_code
+    recurly_account_acquisition = recurly.AccountAcquisition(**acquisition_params)
+    collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, account_code)
+    recurly_account_acquisition.collection_path = collection_path
+    recurly_account_acquisition.save()

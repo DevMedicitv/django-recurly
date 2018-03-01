@@ -128,12 +128,25 @@ class AccountModelTest(BaseTest):
 
 
     def test_update_and_sync_recurly_billing_info(self):
+        acquisition_params = dict(
+            channel = "referral",
+            subchannel = "google",
+            campaign = "1234 mozart"
+        )
+
         account_input_params = self._get_account_creation_params()
         account = create_and_sync_recurly_account(
             account_params=account_input_params,
-            billing_info_params=None
+            billing_info_params=None,
+            acquisition_params=acquisition_params
         )
         assert not hasattr(account, "billing_info"), account.billing_info
+
+        acquisition_data = account.get_acquisition_data()
+        assert acquisition_data
+        assert acquisition_data.channel == "referral"
+        assert acquisition_data.subchannel == "google"
+        assert acquisition_data.campaign == "1234 mozart"
 
         billing_info_input_params = self._get_billing_info_creation_params()
         account2 =update_and_sync_recurly_billing_info(account, billing_info_params=billing_info_input_params)
@@ -365,19 +378,6 @@ class AccountModelTest(BaseTest):
         print(">>>>>>", plan.unit_amount_in_cents.currencies)
         #addbreakage
 
-    def test_create_account_acquisition_data(self):
-        _account = self._create_recurly_test_account()
-        acquisition_params = dict(
-            channel = "referral",
-            subchannel = "google",
-            campaign = "1234 mozart"
-        )
-        _account.set_acquisition_data(acquisition_params)
-        acquisition_data = _account.get_acquisition_data()
-        assert acquisition_data
-        assert acquisition_data.channel == "referral"
-        assert acquisition_data.subchannel == "google"
-        assert acquisition_data.campaign == "1234 mozart"
 
 '''
     # ------------------------------------- BROKEN STUFFS BELOW

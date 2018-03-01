@@ -385,17 +385,6 @@ class Account(SaveDirtyModel, TimeStampedModel):
         return acquisition_data
 
 
-    def set_acquisition_data(self, acquisition_params):
-        """
-        add acquisition data to a remote recurly account
-        """
-        acquisition_params['account_code'] = self.account_code
-        recurly_account_acquisition = recurly.AccountAcquisition(**acquisition_params)
-        collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, self.account_code)
-        recurly_account_acquisition.collection_path = collection_path
-        recurly_account_acquisition.save()
-
-
 class BillingInfo(SaveDirtyModel):
 
     UNIQUE_LOOKUP_FIELD = None
