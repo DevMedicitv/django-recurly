@@ -127,7 +127,7 @@ class AccountModelTest(BaseTest):
         return account
 
 
-    def test_update_and_sync_recurly_billing_info(self):
+    def test_create_update_and_sync_recurly_account_and_ressources(self):
         acquisition_params = dict(
             channel = "referral",
             subchannel = "google",
