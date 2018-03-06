@@ -631,6 +631,11 @@ class Subscription(SaveDirtyModel):
             return pending_subscription
         return None
 
+    def get_subcription_date(self):
+        if self.legacy_starts_at:
+            return self.legacy_starts_at
+        return self.activated_at
+
     def __get_pending_changes(self):
         if self.xml is None:
             return None
