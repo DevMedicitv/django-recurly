@@ -693,14 +693,12 @@ class Subscription(SaveDirtyModel):
 
         self.sync(recurly_subscription)
 
-    def __reactivate(self):
+    def reactivate(self):
         """Reactivate the canceled subscription so it renews at the end of the
         current billing cycle"""
-        recurly_subscription = self.get_subscription()
+        recurly_subscription = self.get_recurly_subscription()
         if recurly_subscription.state == 'canceled':
             recurly_subscription.reactivate()
-
-        self.sync(recurly_subscription)
 
     def __terminate(self, refund="none"):
         """Terminate the subscription
