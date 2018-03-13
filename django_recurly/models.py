@@ -387,6 +387,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
         except recurly.errors.NotFoundError:
             return None
 
+    def redeem_coupon(self, coupon_code, currency):
+        from recurly import Coupon, Redemption
+        coupon = Coupon.get(coupon_code)
+        redemption = Redemption(account_code=self.account_code, currency=currency)
+        redemption = coupon.redeem(redemption)
+        return redemption
+
+
 class BillingInfo(SaveDirtyModel):
 
     UNIQUE_LOOKUP_FIELD = None
