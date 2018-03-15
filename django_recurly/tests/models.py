@@ -388,7 +388,7 @@ class AccountModelTest(BaseTest):
     def test_redeem_coupon(self):
         account = self._create_recurly_test_account(plan_codes=['premium-annual'])
         coupon = self._create_coupon_code()
-        redemption = account.redeem_coupon(coupon.coupon_code, 'EUR')
+        redemption = account.redeem_coupon(coupon.coupon_code)
         assert redemption
         assert redemption.state == 'active'
         assert len(account.get_recurly_account().redemptions()) == 1
