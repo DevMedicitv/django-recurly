@@ -126,6 +126,19 @@ class AccountModelTest(BaseTest):
         assert account.subscriptions.count() == len(plan_codes)
         return account
 
+    @staticmethod
+    def _create_coupon_code():
+        from recurly import Coupon
+        coupon = Coupon(
+            coupon_code='coupon_code_%s' % int(time.time()),
+            duration='single_use',
+            applies_to_all_plans=True,
+            discount_type='percent',
+            discount_percent=10,
+            name='test coupon'
+        )
+        coupon.save()
+        return coupon
 
     def test_create_update_and_sync_recurly_account_and_ressources(self):
         acquisition_params = dict(
@@ -371,6 +384,14 @@ class AccountModelTest(BaseTest):
         assert pending.quantity == 1
         assert pending.current_period_ends_at is None
         assert pending.state == "active"  # weird but not "future"
+
+    def test_redeem_coupon(self):
+        account = self._create_recurly_test_account(plan_codes=['premium-annual'])
+        coupon = self._create_coupon_code()
+        redemption = account.redeem_coupon(coupon.coupon_code)
+        assert redemption
+        assert redemption.state == 'active'
+        assert len(account.get_recurly_account().redemptions()) == 1
 
 
     def ___test_plan_currencies(self):
