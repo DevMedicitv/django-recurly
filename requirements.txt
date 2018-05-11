@@ -1,1 +1,1 @@
-git+https://github.com/recurly/recurly-client-python.git@c24c2b3f8589fe629e93316f7754aacb825ad6c4
+recurly==2.8.2
