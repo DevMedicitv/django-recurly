@@ -152,6 +152,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
     company_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     vat_number = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
     tax_exempt = models.NullBooleanField(default=None)
+    has_past_due_invoice = models.NullBooleanField(default=None)
 
     # no ADDRESS/SHIPPING_ADDRESS info stored for now
 
