@@ -73,6 +73,24 @@ def update_and_sync_recurly_billing_info(account, billing_info_params):
     return local_account
 
 
+def delete_and_sync_recurly_billing_info(account):
+    """
+        Remove Billing Info from remote account then synchronize with local recurly
+    """
+    remote_recurly_account = account.get_recurly_account()
+    billing_info = remote_recurly_account.billing_info
+    if billing_info:
+        billing_info.delete()
+    else:
+        raise Exception("User billing info doesn't exist")
+
+    try:
+        remote_recurly_account = account.get_recurly_account()  # refresh
+        local_account = update_local_account_data_from_recurly_resource(recurly_account=remote_recurly_account)
+    except Exception as e:
+        raise Exception("User billing info update_local_account Error: {}".format(e))
+
+    return local_account
 
 
 def create_and_sync_recurly_subscription(subscription_params, account_params, billing_info_params=None):
