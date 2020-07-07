@@ -787,6 +787,14 @@ class Subscription(SaveDirtyModel):
         return subscription
 
 
+class SubscriptionAddOn(SaveDirtyModel):
+    subscription = models.ForeignKey(Subscription, related_name="subscription_add_ons", **BLANKABLE_FIELD_ARGS)
+    add_on_code = models.CharField(max_length=200)
+    quantity = models.IntegerField(default=1)
+    unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    address = models.CharField(max_length=200, **BLANKABLE_CHARFIELD_ARGS)
+
+
 # TODO - update fields of this model according to recurly.Transaction
 class Payment(SaveDirtyModel):
 
