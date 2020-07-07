@@ -261,8 +261,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
         Errors are raised if there is no or several live subscriptions.
         """
 
-        # BUGGY: self.subscriptions(manager='live_subscriptions').get_queryset() doesn't work
-        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES)
+        premium_subscription_plan_code = [plan.get('plan_code') for plan in settings.RECURLY_PREMIUM_PLANS]
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
+                                               plan_code__in=premium_subscription_plan_code)
         subscriptions = queryset.all()
 
         # TODO raise error if several subscriptions!!
