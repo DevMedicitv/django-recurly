@@ -5,7 +5,7 @@ import recurly
 
 from recurly.errors import NotFoundError
 
-from .models import logger, Account, BillingInfo, Subscription
+from .models import logger, Account, BillingInfo, Subscription, SubscriptionAddOn
 
 
 def _construct_recurly_account_resource(account_params, billing_info_params=None):
@@ -341,6 +341,21 @@ def ______update_local_billing_info_data_from_recurly_resource(recurly_billing_i
     return billing_info
 
 
+def update_local_add_ons_from_recurly_resource(remote_subscription, local_subscription):
+    def __modelify_add_on(remote_subscription_add_on, local_existing_add_on):
+        assert isinstance(remote_subscription_add_on, recurly.SubscriptionAddOn)
+        modelify(remote_subscription_add_on, SubscriptionAddOn,
+                 existing_instance=local_existing_add_on)
+
+    for recurly_subscription_add_on in remote_subscription.subscription_add_ons:
+        local_subscription_add_on = \
+            local_subscription.subscription_add_ons.filter(add_on_code=recurly_subscription_add_on.add_on_code).first()
+        if local_subscription_add_on:  # Just update not create a new add_on
+            __modelify_add_on(recurly_subscription_add_on, local_subscription_add_on)
+        else:
+            raise Exception("Error: local subscription add_on_code is not match with remote add_on_code")
+
+
 def update_local_subscription_data_from_recurly_resource(recurly_subscription):
     """
     Overrides local fields of this Subscription with remote ones.
@@ -365,9 +380,12 @@ def update_full_local_data_for_account_code(account_code):
 
     legit_uuids = []
     for recurly_subscription in recurly_account.subscriptions():
-        subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
-        account.subscriptions.add(subscription)  # model linking
-        legit_uuids.append(subscription.uuid)
+        local_subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
+        account.subscriptions.add(local_subscription)  # model linking
+        legit_uuids.append(local_subscription.uuid)
+
+        if local_subscription.subscription_add_ons.exists():
+            update_local_add_ons_from_recurly_resource(recurly_subscription, local_subscription)
 
     for subscription in account.subscriptions.all():
         if subscription.uuid not in legit_uuids:
