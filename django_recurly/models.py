@@ -256,24 +256,25 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def get_live_subscription_or_none(self):  # FIXME - test this
         """
-        A SINGLE live subscription is returned.
-        
-        Errors are raised if there is no or several live subscriptions.
+            A SINGLE live subscription is returned.
         """
 
-        premium_subscription_plan_code = [plan.get('plan_code') for plan in settings.RECURLY_PREMIUM_PLANS]
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_PLANS]
         queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
-                                               plan_code__in=premium_subscription_plan_code)
-        subscriptions = queryset.all()
+                                               plan_code__in=plan_codes)
+        return queryset.first()
 
-        # TODO raise error if several subscriptions!!
-        '''
-        if len(subscriptions) > 1:
-            raise Subscription.MultipleObjectsReturned()
-        elif len(subscriptions) == 0:
-            raise Subscription.DoesNotExist()
-        '''
-        return subscriptions.first()
+    def get_live_subscription_kaufmann(self):
+        """
+            Kaufmann is a type of subscription for the movie rental
+        """
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_KAUFMANN_PLAN]
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
+                                               plan_code__in=plan_codes)
+        subscriptions = queryset.first()
+        if subscriptions and subscriptions.subscription_add_ons.exists():
+            return subscriptions
+        return None
 
     def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
