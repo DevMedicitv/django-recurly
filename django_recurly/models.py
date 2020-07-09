@@ -274,6 +274,14 @@ class Account(SaveDirtyModel, TimeStampedModel):
         subscriptions = queryset.all()
         return subscriptions  # return a list of subscription kaufmann
 
+    def get_rented_movies(self):
+        rented_movie_ids = []
+        subscriptions_kaufmann = self.get_live_subscription_kaufmann()
+        for subscription in subscriptions_kaufmann:
+            for subscription_add_on in subscription.subscription_add_ons.all():
+                rented_movie_ids = rented_movie_ids.append(str(subscription_add_on.add_on_code).partition("movie_")[2])
+        return rented_movie_ids
+
     def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
         return recurly.Account.get(self.account_code)
