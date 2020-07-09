@@ -271,10 +271,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_KAUFMANN_PLAN]
         queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
                                                plan_code__in=plan_codes)
-        subscriptions = queryset.first()
-        if subscriptions and subscriptions.subscription_add_ons.exists():
-            return subscriptions
-        return None
+        subscriptions = queryset.all()
+        return subscriptions  # return a list of subscription kaufmann
 
     def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
