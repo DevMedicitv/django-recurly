@@ -108,8 +108,8 @@ def create_remote_subsciption(subscription_params, account_params, billing_info_
 def create_remote_subscription_with_add_on(subscription_params, account_params, add_ons_data, billing_info_params=None):
     remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
 
-    created_subscription_add_ons = [recurly.SubscriptionAddOn(add_on_code=add_on.add_on_code,
-                                                              unit_amount_in_cents=add_on.unit_amount_in_cents,
+    created_subscription_add_ons = [recurly.SubscriptionAddOn(add_on_code=add_on["add_on_code"],
+                                                              unit_amount_in_cents=add_on["unit_amount_in_cents"],
                                                               quantity=1
                                                               ) for add_on in add_ons_data]
 
@@ -118,16 +118,8 @@ def create_remote_subscription_with_add_on(subscription_params, account_params, 
     return remote_subscription
 
 
-def create_and_sync_recurly_subscription_with_add_ons(subscription_params, account_params,
-                                                      add_ons_data, billing_info_params=None):
-
-    remote_subscription_with_add_on = create_remote_subscription_with_add_on(subscription_params, account_params,
-                                                                             add_ons_data, billing_info_params)
-
-    update_full_local_data_for_account_code(account_code=remote_subscription_with_add_on.account_code)
-
-
-def create_and_sync_recurly_subscription(subscription_params, account_params, billing_info_params=None):
+def create_and_sync_recurly_subscription(subscription_params, account_params,
+                                         billing_info_params=None, add_ons_data=None):
     """
     Returns a LOCAL Subscription instance.
 
@@ -137,7 +129,11 @@ def create_and_sync_recurly_subscription(subscription_params, account_params, bi
     automatically attached to a corresponding django Account instance.
     """
 
-    remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
+    if add_ons_data:
+        remote_subscription = create_remote_subscription_with_add_on(subscription_params, account_params,
+                                                                     add_ons_data, billing_info_params)
+    else:
+        remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
     remote_account = remote_subscription.account()
 
     # FULL RELOAD because lots of stuffs may have changed, and recurly API client refresh is damn buggy
