@@ -140,7 +140,7 @@ def create_and_sync_recurly_subscription(subscription_params, account_params,
     account = update_full_local_data_for_account_code(account_code=remote_account.account_code)
     assert account.subscriptions.count()
 
-    subscription = account.subscriptions.filter(uuid=remote_account.uuid).first()
+    subscription = account.subscriptions.filter(uuid=remote_subscription.uuid).first()
     assert subscription
     return subscription
 
