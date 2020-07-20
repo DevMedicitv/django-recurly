@@ -264,20 +264,20 @@ class Account(SaveDirtyModel, TimeStampedModel):
                                                plan_code__in=plan_codes)
         return queryset.first()
 
-    def get_live_subscription_kaufmann(self):
+    def get_live_rented_movie_subscription(self):
         """
             Kaufmann is a type of subscription for the movie rental
         """
-        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_KAUFMANN_PLAN]
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_MOVIE_RENTAL_PLAN]
         queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
                                                plan_code__in=plan_codes)
         subscriptions = queryset.all()
-        return subscriptions  # return a list of subscription kaufmann
+        return subscriptions
 
-    def get_rented_movies(self):
+    def get_active_rented_movies(self):
         rented_movie_ids = []
-        subscriptions_kaufmann = self.get_live_subscription_kaufmann()
-        for subscription in subscriptions_kaufmann:
+        rented_movie_subscription = self.get_live_rented_movie_subscription()
+        for subscription in rented_movie_subscription:
             for subscription_add_on in subscription.subscription_add_ons.all():
                 rented_movie_ids = rented_movie_ids.append(str(subscription_add_on.add_on_code).partition("movie_")[2])
         return rented_movie_ids
