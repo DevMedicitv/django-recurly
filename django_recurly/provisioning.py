@@ -5,6 +5,7 @@ import recurly
 
 from recurly.errors import NotFoundError
 
+from .exceptions import PreVerificationTransactionRecurlyError
 from .models import logger, Account, BillingInfo, Subscription, SubscriptionAddOn
 
 
@@ -101,20 +102,28 @@ def create_remote_subsciption(subscription_params, account_params, billing_info_
     subscription_params["account"] = recurly_account
 
     recurly_subscription = recurly.Subscription(**subscription_params)
-    recurly_subscription.save()
     return recurly_subscription
 
 
 def create_remote_subscription_with_add_on(subscription_params, account_params, add_ons_data, billing_info_params=None):
+    def __check_add_ons_code(_subscription_params, _add_ons_data):
+        plan = recurly.Plan.get(_subscription_params["plan_code"])
+        remote_add_ons_code = [add_on.add_on_code for add_on in plan.add_ons()]
+        submitted_add_ons_code = ["movie_{}".format(add_on["movie_id"]) for add_on in _add_ons_data]
+        for submit_code in submitted_add_ons_code:
+            if submit_code not in remote_add_ons_code:
+                raise PreVerificationTransactionRecurlyError(transaction_error_code="invalid_movie_add_ons_code",)
+
+    __check_add_ons_code(subscription_params, add_ons_data)
     remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
 
-    created_subscription_add_ons = [recurly.SubscriptionAddOn(add_on_code=add_on["add_on_code"],
-                                                              unit_amount_in_cents=add_on["unit_amount_in_cents"],
-                                                              quantity=1
-                                                              ) for add_on in add_ons_data]
+    created_subscription_add_ons = [recurly.SubscriptionAddOn(
+        add_on_code="movie_{}".format(add_on["movie_id"]),
+        unit_amount_in_cents=add_on["unit_amount_in_cents"],
+        quantity=1
+    ) for add_on in add_ons_data]
 
     remote_subscription.subscription_add_ons = created_subscription_add_ons
-    remote_subscription.save()
     return remote_subscription
 
 
@@ -134,6 +143,7 @@ def create_and_sync_recurly_subscription(subscription_params, account_params,
                                                                      add_ons_data, billing_info_params)
     else:
         remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
+    remote_subscription.save()
     remote_account = remote_subscription.account()
 
     # FULL RELOAD because lots of stuffs may have changed, and recurly API client refresh is damn buggy
