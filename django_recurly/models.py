@@ -279,7 +279,8 @@ class Account(SaveDirtyModel, TimeStampedModel):
         rented_movie_subscription = self.get_live_rented_movie_subscription()
         for subscription in rented_movie_subscription:
             for subscription_add_on in subscription.subscription_add_ons.all():
-                rented_movie_ids = rented_movie_ids.append(str(subscription_add_on.add_on_code).partition("movie_")[2])
+                # format add_on_code ex: "movie_100"
+                rented_movie_ids.append(subscription_add_on.add_on_code.partition("movie_")[2])
         return rented_movie_ids
 
     def get_recurly_account(self):
