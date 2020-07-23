@@ -438,3 +438,19 @@ def set_acquisition_data(account_code, acquisition_params):
     collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, account_code)
     recurly_account_acquisition.collection_path = collection_path
     recurly_account_acquisition.save()
+
+
+def lookup_plan_add_on(plan_code, add_on_code=None):
+    def _serializer_add_on(_add_on):
+        serialized_add_on_data = {"add_on_code": add_on.add_on_code, "name": add_on.name,
+                                  "currencies": add_on.unit_amount_in_cents.currencies}
+        return serialized_add_on_data
+
+    add_on_list = []
+    plan = recurly.Plan.get(plan_code)
+    if not add_on_code:
+        for add_on in plan.add_ons():
+            add_on_list.append(_serializer_add_on(add_on))
+        return add_on_list
+    add_on = plan.get_add_on(add_on_code)
+    return _serializer_add_on(add_on)
