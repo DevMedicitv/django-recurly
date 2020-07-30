@@ -456,4 +456,5 @@ def lookup_plan_add_on(plan_code, add_on_code=None):
             add_on_list.append(_serializer_add_on(add_on))
         return add_on_list
     add_on = plan.get_add_on(add_on_code)
-    return _serializer_add_on(add_on)
+    add_on_list.append(_serializer_add_on(add_on))
+    return add_on_list
