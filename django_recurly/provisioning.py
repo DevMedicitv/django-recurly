@@ -116,7 +116,7 @@ def create_remote_subscription_with_add_on(subscription_params, account_params, 
         submitted_add_ons_code = [add_on["add_on_code"] for add_on in _add_ons_data]
         for submit_code in submitted_add_ons_code:
             if submit_code not in remote_add_ons_code:
-                raise PreVerificationTransactionRecurlyError(transaction_error_code="invalid_movie_add_ons_code",)
+                raise PreVerificationTransactionRecurlyError(transaction_error_code="invalid_add_ons_code",)
 
     __check_add_ons_code(subscription_params, add_ons_data)
     remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
