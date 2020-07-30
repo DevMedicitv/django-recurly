@@ -75,22 +75,26 @@ def update_and_sync_recurly_billing_info(account, billing_info_params):
 
 
 def sync_local_add_ons_from_recurly_resource(remote_subscription, local_subscription):
-    def __modelify_add_on(remote_subscription_add_on, local_existing_add_on):
-        assert isinstance(remote_subscription_add_on, recurly.SubscriptionAddOn)
+    def __modelify_add_on(_local_subscription, _remote_subscription_add_on, _local_existing_add_on):
+        assert isinstance(_remote_subscription_add_on, recurly.SubscriptionAddOn)
 
         # Update
-        if local_existing_add_on:
-            modelify(remote_subscription_add_on, SubscriptionAddOn, existing_instance=local_existing_add_on)
+        if _local_existing_add_on:
+            modelify(_remote_subscription_add_on, SubscriptionAddOn, existing_instance=_local_existing_add_on)
         # Create
         else:
-            subscription_add_on = modelify(remote_subscription_add_on, SubscriptionAddOn)
-            local_subscription.subscription_add_ons.add(subscription_add_on)
+            subscription_add_on = modelify(_remote_subscription_add_on, SubscriptionAddOn)
+            _local_subscription.subscription_add_ons.add(subscription_add_on)
 
     for recurly_subscription_add_on in remote_subscription.subscription_add_ons:
         local_subscription_add_on = \
             local_subscription.subscription_add_ons.filter(add_on_code=recurly_subscription_add_on.add_on_code).first()
 
-        __modelify_add_on(recurly_subscription_add_on, local_subscription_add_on)
+        __modelify_add_on(_local_subscription=local_subscription,
+                          _remote_subscription_add_on=recurly_subscription_add_on,
+                          _local_existing_add_on=local_subscription_add_on,)
+
+    return local_subscription
 
 
 def create_remote_subsciption(subscription_params, account_params, billing_info_params=None):
@@ -416,10 +420,9 @@ def update_full_local_data_for_account_code(account_code):
     legit_uuids = []
     for recurly_subscription in recurly_account.subscriptions():
         local_subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
+        local_subscription = sync_local_add_ons_from_recurly_resource(recurly_subscription, local_subscription)
         account.subscriptions.add(local_subscription)  # model linking
         legit_uuids.append(local_subscription.uuid)
-
-        sync_local_add_ons_from_recurly_resource(recurly_subscription, local_subscription)
 
     for subscription in account.subscriptions.all():
         if subscription.uuid not in legit_uuids:
