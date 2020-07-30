@@ -113,7 +113,7 @@ def create_remote_subscription_with_add_on(subscription_params, account_params, 
     def __check_add_ons_code(_subscription_params, _add_ons_data):
         plan = recurly.Plan.get(_subscription_params["plan_code"])
         remote_add_ons_code = [add_on.add_on_code for add_on in plan.add_ons()]
-        submitted_add_ons_code = ["movie_{}".format(add_on["movie_id"]) for add_on in _add_ons_data]
+        submitted_add_ons_code = [add_on["add_on_code"] for add_on in _add_ons_data]
         for submit_code in submitted_add_ons_code:
             if submit_code not in remote_add_ons_code:
                 raise PreVerificationTransactionRecurlyError(transaction_error_code="invalid_movie_add_ons_code",)
@@ -122,8 +122,7 @@ def create_remote_subscription_with_add_on(subscription_params, account_params, 
     remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
 
     created_subscription_add_ons = [recurly.SubscriptionAddOn(
-        add_on_code="movie_{}".format(add_on["movie_id"]),
-        unit_amount_in_cents=add_on["unit_amount_in_cents"],
+        add_on_code=add_on["add_on_code"],
         quantity=1
     ) for add_on in add_ons_data]
 
