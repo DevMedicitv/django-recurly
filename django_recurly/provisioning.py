@@ -5,7 +5,8 @@ import recurly
 
 from recurly.errors import NotFoundError
 
-from .models import logger, Account, BillingInfo, Subscription
+from .exceptions import PreVerificationTransactionRecurlyError
+from .models import logger, Account, BillingInfo, Subscription, SubscriptionAddOn
 
 
 def _construct_recurly_account_resource(account_params, billing_info_params=None):
@@ -73,9 +74,64 @@ def update_and_sync_recurly_billing_info(account, billing_info_params):
     return local_account
 
 
+def sync_local_add_ons_from_recurly_resource(remote_subscription, local_subscription):
+    def __modelify_add_on(_local_subscription, _remote_subscription_add_on, _local_existing_add_on):
+        assert isinstance(_remote_subscription_add_on, recurly.SubscriptionAddOn)
+
+        # Update
+        if _local_existing_add_on:
+            modelify(_remote_subscription_add_on, SubscriptionAddOn, existing_instance=_local_existing_add_on)
+        # Create
+        else:
+            subscription_add_on = modelify(_remote_subscription_add_on, SubscriptionAddOn)
+            _local_subscription.subscription_add_ons.add(subscription_add_on)
+
+    for recurly_subscription_add_on in remote_subscription.subscription_add_ons:
+        local_subscription_add_on = \
+            local_subscription.subscription_add_ons.filter(add_on_code=recurly_subscription_add_on.add_on_code).first()
+
+        __modelify_add_on(_local_subscription=local_subscription,
+                          _remote_subscription_add_on=recurly_subscription_add_on,
+                          _local_existing_add_on=local_subscription_add_on,)
+
+    return local_subscription
 
 
-def create_and_sync_recurly_subscription(subscription_params, account_params, billing_info_params=None):
+def create_remote_subsciption(subscription_params, account_params, billing_info_params=None):
+    assert "account" not in subscription_params, subscription_params
+    recurly_account = _construct_recurly_account_resource(account_params,
+                                                          billing_info_params=billing_info_params)
+
+    subscription_params = copy.deepcopy(subscription_params)  # do not touch input object
+    subscription_params["account"] = recurly_account
+
+    recurly_subscription = recurly.Subscription(**subscription_params)
+    return recurly_subscription
+
+
+def create_remote_subscription_with_add_on(subscription_params, account_params, add_ons_data, billing_info_params=None):
+    def __check_add_ons_code(_subscription_params, _add_ons_data):
+        plan = recurly.Plan.get(_subscription_params["plan_code"])
+        remote_add_ons_code = [add_on.add_on_code for add_on in plan.add_ons()]
+        submitted_add_ons_code = [add_on["add_on_code"] for add_on in _add_ons_data]
+        for submit_code in submitted_add_ons_code:
+            if submit_code not in remote_add_ons_code:
+                raise PreVerificationTransactionRecurlyError(transaction_error_code="invalid_add_ons_code",)
+
+    __check_add_ons_code(subscription_params, add_ons_data)
+    remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
+
+    created_subscription_add_ons = [recurly.SubscriptionAddOn(
+        add_on_code=add_on["add_on_code"],
+        quantity=1
+    ) for add_on in add_ons_data]
+
+    remote_subscription.subscription_add_ons = created_subscription_add_ons
+    return remote_subscription
+
+
+def create_and_sync_recurly_subscription(subscription_params, account_params,
+                                         billing_info_params=None, add_ons_data=None):
     """
     Returns a LOCAL Subscription instance.
 
@@ -85,21 +141,19 @@ def create_and_sync_recurly_subscription(subscription_params, account_params, bi
     automatically attached to a corresponding django Account instance.
     """
 
-    assert "account" not in subscription_params, subscription_params
-    recurly_account = _construct_recurly_account_resource(account_params,
-                                                          billing_info_params=billing_info_params)
-
-    subscription_params = copy.deepcopy(subscription_params)  # do not touch input object
-    subscription_params["account"] = recurly_account
-
-    recurly_subscription = recurly.Subscription(**subscription_params)
-    recurly_subscription.save()
+    if add_ons_data:
+        remote_subscription = create_remote_subscription_with_add_on(subscription_params, account_params,
+                                                                     add_ons_data, billing_info_params)
+    else:
+        remote_subscription = create_remote_subsciption(subscription_params, account_params, billing_info_params)
+    remote_subscription.save()
+    remote_account = remote_subscription.account()
 
     # FULL RELOAD because lots of stuffs may have changed, and recurly API client refresh is damn buggy
-    account = update_full_local_data_for_account_code(account_code=recurly_account.account_code)
+    account = update_full_local_data_for_account_code(account_code=remote_account.account_code)
     assert account.subscriptions.count()
 
-    subscription = account.subscriptions.filter(uuid=recurly_subscription.uuid).first()
+    subscription = account.subscriptions.filter(uuid=remote_subscription.uuid).first()
     assert subscription
     return subscription
 
@@ -221,7 +275,7 @@ def modelify(resource, model_class, existing_instance=None, remove_empty=False, 
     elif not save:
         pass  # no unicity problem, just a transient object
 
-    elif model_class.UNIQUE_LOOKUP_FIELD:
+    elif getattr(model_class, "UNIQUE_LOOKUP_FIELD", None):
 
         if not model_updates.get(model_class.UNIQUE_LOOKUP_FIELD):
             raise RuntimeError("Remote recurly record has no value for unique field %s" %
@@ -355,7 +409,6 @@ def update_local_subscription_data_from_recurly_resource(recurly_subscription):
     return subscription
 
 
-
 def update_full_local_data_for_account_code(account_code):
 
     recurly_account = recurly.Account.get(account_code)
@@ -365,9 +418,10 @@ def update_full_local_data_for_account_code(account_code):
 
     legit_uuids = []
     for recurly_subscription in recurly_account.subscriptions():
-        subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
-        account.subscriptions.add(subscription)  # model linking
-        legit_uuids.append(subscription.uuid)
+        local_subscription = update_local_subscription_data_from_recurly_resource(recurly_subscription)
+        local_subscription = sync_local_add_ons_from_recurly_resource(recurly_subscription, local_subscription)
+        account.subscriptions.add(local_subscription)  # model linking
+        legit_uuids.append(local_subscription.uuid)
 
     for subscription in account.subscriptions.all():
         if subscription.uuid not in legit_uuids:
@@ -386,3 +440,20 @@ def set_acquisition_data(account_code, acquisition_params):
     collection_path = "{}/{}/acquisition".format(recurly.Account.collection_path, account_code)
     recurly_account_acquisition.collection_path = collection_path
     recurly_account_acquisition.save()
+
+
+def lookup_plan_add_on(plan_code, add_on_code=None):
+    def _serializer_add_on(_add_on):
+        serialized_add_on_data = {"add_on_code": add_on.add_on_code, "name": add_on.name,
+                                  "currencies": add_on.unit_amount_in_cents.currencies}
+        return serialized_add_on_data
+
+    add_on_list = []
+    plan = recurly.Plan.get(plan_code)
+    if not add_on_code:
+        for add_on in plan.add_ons():
+            add_on_list.append(_serializer_add_on(add_on))
+        return add_on_list
+    add_on = plan.get_add_on(add_on_code)
+    add_on_list.append(_serializer_add_on(add_on))
+    return add_on_list
