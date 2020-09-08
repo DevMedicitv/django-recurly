@@ -266,7 +266,7 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def get_live_rented_movie_subscription(self):
         """
-            Kaufmann is a type of subscription for the movie rental
+            RECURLY_MOVIE_RENTAL_PLAN is a list of subscription for the movie rental
         """
         plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_MOVIE_RENTAL_PLAN]
         queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
