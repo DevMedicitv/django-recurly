@@ -260,8 +260,11 @@ class Account(SaveDirtyModel, TimeStampedModel):
         """
 
         plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_PLANS]
-        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
-                                               plan_code__in=plan_codes)
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES)
+        for plan_code in plan_codes:
+            # RECURLY_PLAN doesn't list latin plans whose plan_code are like "plan_code+latin-america"
+            queryset = queryset.filter(plan_code__contains=plan_code)
+
         return queryset.first()
 
     def get_live_rented_movie_subscription(self):
