@@ -65,6 +65,10 @@ LOGGING = {
     }
 }
 
+RECURLY_PLANS = []  # abstraction settings
+RECURLY_MOVIE_RENTAL_PLAN = []  # abstraction settings
+
+
 # local_settings.py can be used to override environment-specific settings
 # like database and email that differ between development and production.
 try:

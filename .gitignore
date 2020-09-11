@@ -14,3 +14,4 @@ dist
 build
 /local_settings.py
 .idea
+venv

@@ -256,23 +256,38 @@ class Account(SaveDirtyModel, TimeStampedModel):
 
     def get_live_subscription_or_none(self):  # FIXME - test this
         """
-        A SINGLE live subscription is returned.
-        
-        Errors are raised if there is no or several live subscriptions.
+            A SINGLE live subscription is returned.
         """
 
-        # BUGGY: self.subscriptions(manager='live_subscriptions').get_queryset() doesn't work
-        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES)
-        subscriptions = queryset.all()
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_PLANS]
 
-        # TODO raise error if several subscriptions!!
-        '''
-        if len(subscriptions) > 1:
-            raise Subscription.MultipleObjectsReturned()
-        elif len(subscriptions) == 0:
-            raise Subscription.DoesNotExist()
-        '''
-        return subscriptions.first()
+        # RECURLY_PLAN doesn't list latin plans whose plan_code are like "plan_code+latin-america"
+        q_objects = Q()
+        for plan_code in plan_codes:
+            q_objects |= Q(plan_code__contains=plan_code)
+
+        queryset = Subscription.objects.filter(Q(account=self) & Q(state__in=Subscription.LIVE_STATES) & q_objects)
+
+        return queryset.first()
+
+    def get_live_rented_movie_subscription(self):
+        """
+            RECURLY_MOVIE_RENTAL_PLAN is a list of subscription for the movie rental
+        """
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_MOVIE_RENTAL_PLAN]
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.LIVE_STATES,
+                                               plan_code__in=plan_codes)
+        subscriptions = queryset.all()
+        return subscriptions
+
+    def get_active_rented_movies(self):
+        rented_movie_ids = []
+        rented_movie_subscription = self.get_live_rented_movie_subscription()
+        for subscription in rented_movie_subscription:
+            for subscription_add_on in subscription.subscription_add_ons.all():
+                # format add_on_code ex: "movie_100"
+                rented_movie_ids.append(subscription_add_on.add_on_code.partition("movie_")[2])
+        return rented_movie_ids
 
     def get_recurly_account(self):
         # TODO: (IW) Cache/store account object
@@ -785,6 +800,14 @@ class Subscription(SaveDirtyModel):
 
         subscription.save(remote=False)
         return subscription
+
+
+class SubscriptionAddOn(SaveDirtyModel):
+    subscription = models.ForeignKey(Subscription, related_name="subscription_add_ons", **BLANKABLE_FIELD_ARGS)
+    add_on_code = models.CharField(max_length=200)
+    quantity = models.IntegerField(default=1)
+    unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)
+    address = models.CharField(max_length=200, **BLANKABLE_CHARFIELD_ARGS)
 
 
 # TODO - update fields of this model according to recurly.Transaction
