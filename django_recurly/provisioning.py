@@ -443,15 +443,15 @@ def set_acquisition_data(account_code, acquisition_params):
 
 
 def lookup_plan_add_on(plan_code, add_on_code=None):
-    def _serializer_add_on(_add_on):
+    def _serializer_add_on(add_on):
         serialized_add_on_data = {"add_on_code": add_on.add_on_code, "name": add_on.name,
                                   "currencies": add_on.unit_amount_in_cents.currencies}
         return serialized_add_on_data
 
-    def _serializer_plan(_plan, _add_on_list):
+    def _serializer_plan(plan, add_on_list):
         serialized_plan_data = {
-            "plan_duration": _plan.plan_interval_length,
-            "plan_duration_unit": _plan.plan_interval_unit,
+            "plan_duration": plan.plan_interval_length,
+            "plan_duration_unit": plan.plan_interval_unit,
             "add_on_list": [_serializer_add_on(add_on) for add_on in add_on_list]
         }
         return serialized_plan_data
