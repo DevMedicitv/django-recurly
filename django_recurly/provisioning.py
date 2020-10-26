@@ -443,24 +443,24 @@ def set_acquisition_data(account_code, acquisition_params):
 
 
 def lookup_plan_add_on(plan_code, add_on_code=None):
-    def _serializer_add_on(add_on):
-        serialized_add_on_data = {"add_on_code": add_on.add_on_code, "name": add_on.name,
-                                  "currencies": add_on.unit_amount_in_cents.currencies}
+    def _serializer_add_on(add_on1):
+        serialized_add_on_data = {"add_on_code": add_on1.add_on_code, "name": add_on1.name,
+                                  "currencies": add_on1.unit_amount_in_cents.currencies}
         return serialized_add_on_data
 
     def _serializer_plan(plan, add_on_list):
         serialized_plan_data = {
             "plan_duration": plan.plan_interval_length,
             "plan_duration_unit": plan.plan_interval_unit,
-            "add_on_list": [_serializer_add_on(add_on) for add_on in add_on_list]
+            "add_on_list": [_serializer_add_on(add_on2) for add_on2 in add_on_list]
         }
         return serialized_plan_data
 
     add_on_list = []
     plan = recurly.Plan.get(plan_code)
     if not add_on_code:
-        for add_on in plan.add_ons():
-            add_on_list.append(add_on)
+        for add_on0 in plan.add_ons():
+            add_on_list.append(add_on0)
     else:
         add_on_list.append(plan.get_add_on(add_on_code))
 
