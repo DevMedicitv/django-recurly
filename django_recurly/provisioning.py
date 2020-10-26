@@ -448,12 +448,20 @@ def lookup_plan_add_on(plan_code, add_on_code=None):
                                   "currencies": add_on.unit_amount_in_cents.currencies}
         return serialized_add_on_data
 
+    def _serializer_plan(_plan, _add_on_list):
+        serialized_plan_data = {
+            "plan_duration": _plan.plan_interval_length,
+            "plan_duration_unit": _plan.plan_interval_unit,
+            "add_on_list": [_serializer_add_on(add_on) for add_on in add_on_list]
+        }
+        return serialized_plan_data
+
     add_on_list = []
     plan = recurly.Plan.get(plan_code)
     if not add_on_code:
         for add_on in plan.add_ons():
-            add_on_list.append(_serializer_add_on(add_on))
-        return add_on_list
-    add_on = plan.get_add_on(add_on_code)
-    add_on_list.append(_serializer_add_on(add_on))
-    return add_on_list
+            add_on_list.append(add_on)
+    else:
+        add_on_list.append(plan.get_add_on(add_on_code))
+
+    return _serializer_plan(plan, add_on_list)
