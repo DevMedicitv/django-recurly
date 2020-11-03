@@ -280,9 +280,28 @@ class Account(SaveDirtyModel, TimeStampedModel):
         subscriptions = queryset.all()
         return subscriptions
 
+    def get_future_rented_movie_subscription(self):
+        """
+            RECURLY_MOVIE_RENTAL_PLAN is a list of subscription for the movie rental
+        """
+        plan_codes = [plan.get('plan_code') for plan in settings.RECURLY_MOVIE_RENTAL_PLAN]
+        queryset = Subscription.objects.filter(account=self, state__in=Subscription.FUTURE_STATES,
+                                               plan_code__in=plan_codes)
+        subscriptions = queryset.all()
+        return subscriptions
+
     def get_active_rented_movies(self):
         rented_movie_ids = []
         rented_movie_subscription = self.get_live_rented_movie_subscription()
+        for subscription in rented_movie_subscription:
+            for subscription_add_on in subscription.subscription_add_ons.all():
+                # format add_on_code ex: "movie_100"
+                rented_movie_ids.append(subscription_add_on.add_on_code.partition("movie_")[2])
+        return rented_movie_ids
+
+    def get_future_rented_movies(self):
+        rented_movie_ids = []
+        rented_movie_subscription = self.get_future_rented_movie_subscription()
         for subscription in rented_movie_subscription:
             for subscription_add_on in subscription.subscription_add_ons.all():
                 # format add_on_code ex: "movie_100"
@@ -541,6 +560,8 @@ class Subscription(SaveDirtyModel):
     )
 
     LIVE_STATES = ("active", "canceled")  # subscriptions granting premium NOW
+
+    FUTURE_STATES = ("future", )
 
     account = models.ForeignKey(Account, related_name="subscriptions", **BLANKABLE_FIELD_ARGS)
 
