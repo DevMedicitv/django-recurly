@@ -84,7 +84,7 @@ class SaveDirtyModel(models.Model):
         for field in self._meta.fields:  # m2m changes do not require a save
             if field.name in self.SMART_SAVE_IGNORE_FIELDS:
                 continue
-            field_name = ('%s_id' % field.name) if field.rel else field.name
+            field_name = ('%s_id' % field.name) if field.remote_field else field.name
             yield (field.name, getattr(self, field_name))
 
     def _as_dict(self):
