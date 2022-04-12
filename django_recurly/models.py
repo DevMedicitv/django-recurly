@@ -315,6 +315,9 @@ class Account(SaveDirtyModel, TimeStampedModel):
     def get_recurly_invoices(self):
         return self.get_recurly_account().invoices()
 
+    def get_redemptions(self):
+        return self.get_recurly_account().redemptions()
+
     def __get_transactions(self):
         try:
             return self.get_account().transactions
