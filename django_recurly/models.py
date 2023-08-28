@@ -437,7 +437,7 @@ class BillingInfo(SaveDirtyModel):
 
     UNIQUE_LOOKUP_FIELD = None
 
-    account = models.OneToOneField(Account, related_name='billing_info')
+    account = models.OneToOneField(Account, related_name='billing_info', on_delete=models.CASCADE,)
 
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
@@ -566,7 +566,7 @@ class Subscription(SaveDirtyModel):
 
     FUTURE_STATES = ("future", )
 
-    account = models.ForeignKey(Account, related_name="subscriptions", **BLANKABLE_FIELD_ARGS)
+    account = models.ForeignKey(Account, related_name="subscriptions", on_delete=models.CASCADE, **BLANKABLE_FIELD_ARGS)
 
     uuid = models.CharField(max_length=40, unique=True)  # REQUIRED
 
@@ -827,7 +827,7 @@ class Subscription(SaveDirtyModel):
 
 
 class SubscriptionAddOn(SaveDirtyModel):
-    subscription = models.ForeignKey(Subscription, related_name="subscription_add_ons", **BLANKABLE_FIELD_ARGS)
+    subscription = models.ForeignKey(Subscription, related_name="subscription_add_ons", on_delete=models.CASCADE, **BLANKABLE_FIELD_ARGS)
     add_on_code = models.CharField(max_length=200)
     quantity = models.IntegerField(default=1)
     unit_amount_in_cents = models.IntegerField(**BLANKABLE_FIELD_ARGS)
@@ -859,7 +859,7 @@ class Payment(SaveDirtyModel):
         ("billing_info", "Updated billing info"),
     )
 
-    account = models.ForeignKey(Account, db_index=True, **BLANKABLE_FIELD_ARGS)
+    account = models.ForeignKey(Account, db_index=True, on_delete=models.CASCADE, **BLANKABLE_FIELD_ARGS)
     transaction_id = models.CharField(max_length=40, unique=True, db_index=True)
     invoice_id = models.CharField(max_length=40, db_index=True, **BLANKABLE_CHARFIELD_ARGS)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
@@ -943,7 +943,7 @@ class Token(TimeStampedModel):
         ('invoice', 'Invoice'),
     )
 
-    account = models.ForeignKey(Account, related_name="tokens", **BLANKABLE_FIELD_ARGS)
+    account = models.ForeignKey(Account, related_name="tokens", on_delete=models.CASCADE, **BLANKABLE_FIELD_ARGS)
     token = models.CharField(max_length=40, unique=True)
     cls = models.CharField(max_length=12, choices=TYPE_CHOICES)
     identifier = models.CharField(max_length=40)
