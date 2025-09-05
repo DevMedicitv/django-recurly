@@ -439,8 +439,8 @@ class BillingInfo(SaveDirtyModel):
 
     account = models.OneToOneField(Account, related_name='billing_info')
 
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
+    last_name = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
     company = models.CharField(max_length=50, **BLANKABLE_CHARFIELD_ARGS)
 
